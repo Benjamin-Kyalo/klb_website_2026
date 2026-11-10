@@ -238,6 +238,7 @@ p {
   align-items: center;
   gap: 0.7rem;
   margin-bottom: 1.1rem;
+  color: var(--blue-deep);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -248,13 +249,16 @@ p {
   content: "";
   width: 28px;
   height: 2px;
+  background: var(--blue);
 }
 
 .section--ink .kicker {
   color: var(--yellow);
 }
 
-
+.section--ink .kicker::before {
+  background: var(--yellow);
+}
 
 .display {
   font-size: var(--step-6);
@@ -1061,7 +1065,8 @@ p {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px rgba(242, 194, 48, 0.30);
 }
 
 .hero h1 {
@@ -1893,6 +1898,9 @@ p {
   color: var(--yellow);
 }
 
+.digital-band .kicker::before {
+  background: var(--yellow);
+}
 
 .digital-band::before {
   content: "";
@@ -2069,8 +2077,7 @@ p {
   padding: clamp(2rem, 5vw, 4rem);
   overflow: hidden;
   border-radius: var(--radius-md);
-  /* background: var(--yellow); */
-  background: #F3E5AB;
+  background: var(--yellow);
   color: var(--ink);
 }
 
