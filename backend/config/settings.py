@@ -81,12 +81,19 @@ WSGI_APPLICATION = "config.wsgi.application"
 # ---------------------------------------------------------------------------
 # Database - PostgreSQL through DATABASE_URL
 # ---------------------------------------------------------------------------
+_database_url = os.getenv(
+    "DATABASE_URL",
+    "postgres://klb:klb_dev_password@127.0.0.1:5432/klb",
+)
+if _database_url.startswith("https://") or _database_url.startswith("http://"):
+    raise RuntimeError(
+        "DATABASE_URL must be a PostgreSQL connection string, not an HTTP URL. "
+        "For Supabase, use: postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres?sslmode=require"
+    )
+
 DATABASES = {
     "default": dj_database_url.parse(
-        os.getenv(
-            "DATABASE_URL",
-            "postgres://klb:klb_dev_password@127.0.0.1:5432/klb",
-        ),
+        _database_url,
         conn_max_age=600,
         conn_health_checks=True,
     )
@@ -129,10 +136,14 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "300/hour",
-        "enquiry": "20/hour",
+        "anon": "60/min",
+        "user": "120/min",
+        "login": "5/min",
+        "enquiry": "10/min",
+        "newsletter": "5/min",
     },
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
 }
@@ -162,21 +173,8 @@ STORAGES = {
 FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 
 # ---------------------------------------------------------------------------
-# Rate limiting (DRF throttling)
+# Rate limiting (DRF throttling) - merged with pagination settings above
 # ---------------------------------------------------------------------------
-REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-    ],
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "60/min",
-        "user": "120/min",
-        "login": "5/min",
-        "enquiry": "10/min",
-        "newsletter": "5/min",
-    },
-}
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
