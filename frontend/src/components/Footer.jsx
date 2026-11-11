@@ -11,15 +11,6 @@ export default function Footer() {
     <footer className="site-footer">
       <div className="container footer-top">
         <div className="footer-brand">
-          <span className="footer-logo-plate">
-            <img
-              src="/assets/klb-lockup.png"
-              alt="Kenya Literature Bureau"
-              width="569"
-              height="591"
-              loading="lazy"
-            />
-          </span>
           <p>{settings.footer_blurb}</p>
           <div className="footer-social">
             <a href={settings.facebook || "https://www.facebook.com/klbkenya/"} rel="noopener" aria-label="KLB on Facebook">
@@ -64,7 +55,7 @@ export default function Footer() {
       </div>
 
       <div className="container footer-bottom">
-        <p>© {year} Kenya Literature Bureau. All rights reserved.</p>
+        <p>© {year} Kenya Literature Bureau PLC. All rights reserved.</p>
         <ul>
           <li>
             <Link to="/about/">About KLB</Link>

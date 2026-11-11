@@ -63,5 +63,11 @@ class SubscriberSerializer(serializers.ModelSerializer):
         if not created and not subscriber.is_active:
             subscriber.is_active = True
             subscriber.save(update_fields=["is_active"])
-        self.was_created = created
+            self.was_created = True
+        elif not created and subscriber.is_active:
+            self.was_created = False
+            self.already_subscribed = True
+        else:
+            self.was_created = True
+            self.already_subscribed = False
         return subscriber

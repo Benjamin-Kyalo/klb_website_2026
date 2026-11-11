@@ -140,7 +140,7 @@ export default function CataloguePage() {
   return (
     <>
       <Seo
-        title="Books & catalogue | Kenya Literature Bureau"
+        title="Books & catalogue | Kenya Literature Bureau PLC"
         description="Search the KLB catalogue of CBC, secondary, revision and readers titles. Filter by collection, level and subject, and view prices and buying options."
         path="/books/"
         jsonLd={jsonLd}

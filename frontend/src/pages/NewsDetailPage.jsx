@@ -45,7 +45,7 @@ export default function NewsDetailPage() {
     return (
       <div className="container page-loading">
         <Seo
-          title="News item not found | Kenya Literature Bureau"
+          title="News item not found | Kenya Literature Bureau PLC"
           description="That announcement could not be found."
           path={`/news/${slug}/`}
           noindex
@@ -70,14 +70,14 @@ export default function NewsDetailPage() {
     description,
     articleSection: article.category || undefined,
     image: article.image ? `${SITE_URL}${safeImagePath(article.image)}` : `${SITE_URL}/assets/og-klb.jpg`,
-    author: { "@type": "Organization", name: "Kenya Literature Bureau" },
-    publisher: { "@type": "Organization", name: "Kenya Literature Bureau" },
+    author: { "@type": "Organization", name: "Kenya Literature Bureau PLC" },
+    publisher: { "@type": "Organization", name: "Kenya Literature Bureau PLC" },
     mainEntityOfPage: `${SITE_URL}/news/${article.slug}/`,
   };
 
   return (
     <>
-      <Seo title={`${article.title} | Kenya Literature Bureau`} description={description} path={`/news/${article.slug}/`} type="article" jsonLd={jsonLd} />
+      <Seo title={`${article.title} | Kenya Literature Bureau PLC`} description={description} path={`/news/${article.slug}/`} type="article" jsonLd={jsonLd} />
 
       <section className="page-hero page-hero--compact">
         <div className="container">
@@ -108,7 +108,7 @@ export default function NewsDetailPage() {
                 <div dangerouslySetInnerHTML={{ __html: article.body_html }} />
               ) : (
                 <>
-                  <p>{article.summary || "Announcement from Kenya Literature Bureau."}</p>
+                  <p>{article.summary || "Announcement from Kenya Literature Bureau PLC."}</p>
                   <p>
                     Full article text and photography are being recovered from the previous site and will be added. For
                     comment or verification, contact Corporate Communications.

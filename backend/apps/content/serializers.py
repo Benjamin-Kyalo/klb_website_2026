@@ -1,7 +1,7 @@
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import Career, DigitalPartner, DropdownOption, News, Page, Resource, Section, SiteSetting, TeamPhoto, Tender
+from .models import Career, DigitalPartner, DropdownOption, News, Page, Resource, Section, SiteSetting, TeamPhoto, Tender, WebsiteTheme
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -154,20 +154,24 @@ class NewsSerializer(serializers.ModelSerializer):
 
 
 class CareerSerializer(serializers.ModelSerializer):
+    status = serializers.CharField(read_only=True)
+
     class Meta:
         model = Career
         fields = [
             "id", "title", "department", "location", "employment_type", "summary",
-            "body_html", "apply_url", "closing_date", "is_open", "sort_order",
+            "body_html", "apply_url", "opening_date", "closing_date", "status", "is_open", "sort_order",
         ]
 
 
 class TenderSerializer(serializers.ModelSerializer):
+    status = serializers.CharField(read_only=True)
+
     class Meta:
         model = Tender
         fields = [
             "id", "title", "category", "summary", "body_html", "document_url",
-            "published_on", "closing_date", "is_open", "sort_order",
+            "published_on", "opening_date", "closing_date", "status", "is_open", "sort_order",
         ]
 
 
@@ -189,6 +193,15 @@ class DigitalPartnerSerializer(serializers.ModelSerializer):
         model = DigitalPartner
         fields = ["id", "key", "name", "url", "logo", "description", "sort_order", "is_active", "updated_at"]
         read_only_fields = ["id", "updated_at"]
+
+
+class WebsiteThemeSerializer(serializers.ModelSerializer):
+    status = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = WebsiteTheme
+        fields = ["id", "name", "slug", "description", "css_class", "start_date", "end_date", "is_active", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "status", "created_at", "updated_at"]
 
 
 class SiteSettingSerializer(serializers.ModelSerializer):

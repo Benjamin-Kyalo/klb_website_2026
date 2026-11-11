@@ -98,12 +98,25 @@ class Career(models.Model):
     summary = models.TextField(blank=True)
     body_html = models.TextField(blank=True)
     apply_url = models.URLField(max_length=500, blank=True)
+    opening_date = models.DateField(null=True, blank=True)
     closing_date = models.DateField(null=True, blank=True)
     is_open = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["-is_open", "sort_order", "-id"]
+
+    @property
+    def status(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        if self.closing_date and today > self.closing_date:
+            return "expired"
+        if self.closing_date and (self.closing_date - today).days <= 7:
+            return "closing_soon"
+        if self.opening_date and today < self.opening_date:
+            return "upcoming"
+        return "open"
 
     def save(self, *args, **kwargs):
         self.body_html = clean_html(self.body_html)
@@ -120,12 +133,25 @@ class Tender(models.Model):
     body_html = models.TextField(blank=True)
     document_url = models.CharField(max_length=500, blank=True)
     published_on = models.DateField(null=True, blank=True)
+    opening_date = models.DateField(null=True, blank=True)
     closing_date = models.DateField(null=True, blank=True)
     is_open = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = [models.F("published_on").desc(nulls_last=True), "-id"]
+
+    @property
+    def status(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        if self.closing_date and today > self.closing_date:
+            return "expired"
+        if self.closing_date and (self.closing_date - today).days <= 7:
+            return "closing_soon"
+        if self.opening_date and today < self.opening_date:
+            return "upcoming"
+        return "open"
 
     def save(self, *args, **kwargs):
         self.body_html = clean_html(self.body_html)
@@ -199,6 +225,44 @@ class DigitalPartner(models.Model):
         return self.name
 
 
+class WebsiteTheme(models.Model):
+    """A scheduled website theme or campaign.
+
+    When active (within start/end dates), the theme's CSS class is applied
+    to the site. When the campaign ends, the site reverts to the default theme.
+    """
+
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=80, unique=True)
+    description = models.TextField(blank=True)
+    css_class = models.CharField(max_length=80, blank=True, help_text="CSS class applied to the body when active.")
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_date", "name"]
+        verbose_name = "website theme"
+        verbose_name_plural = "website themes"
+
+    @property
+    def status(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        if not self.is_active:
+            return "inactive"
+        if self.start_date and today < self.start_date:
+            return "scheduled"
+        if self.end_date and today > self.end_date:
+            return "expired"
+        return "active"
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class DropdownOption(models.Model):
     """A configurable choice used by dashboard forms.
 
@@ -245,7 +309,7 @@ class DropdownOption(models.Model):
 class SiteSetting(models.Model):
     """Single row of editable global settings (pk=1)."""
 
-    site_name = models.CharField(max_length=160, default="Kenya Literature Bureau")
+    site_name = models.CharField(max_length=160, default="Kenya Literature Bureau PLC")
     tagline = models.CharField(max_length=200, blank=True)
     phone = models.CharField(max_length=80, blank=True)
     phone_alt = models.CharField(max_length=120, blank=True)

@@ -4,7 +4,7 @@ import { getSite } from "../lib/api.js";
 const SiteContext = createContext(null);
 
 export const FALLBACK_SETTINGS = {
-  site_name: "Kenya Literature Bureau",
+  site_name: "Kenya Literature Bureau PLC",
   tagline: "Publishing & printing for you since 1947",
   phone: "020 3541196/7",
   phone_alt: "0711 318 188 · 0732 344 599",
@@ -16,10 +16,10 @@ export const FALLBACK_SETTINGS = {
   ebookstore: "https://klbbooks.com/",
   announcement: "",
   footer_blurb:
-    "Kenya Literature Bureau is a State corporation established in 1947 to publish, print and distribute educational, cultural and scientific materials for Kenya and the region.",
-  seo_default_title: "Kenya Literature Bureau | Books, publishing and printing since 1947",
+    "Kenya Literature Bureau PLC is a State corporation established in 1947 to publish, print and distribute educational, cultural and scientific materials for Kenya and the region.",
+  seo_default_title: "Kenya Literature Bureau PLC | Books, publishing and printing since 1947",
   seo_default_description:
-    "Kenya Literature Bureau publishes and prints CBC, secondary, revision and readers titles. Search KLB books, buy e-books, and enquire about bulk orders or printing services.",
+    "Kenya Literature Bureau PLC publishes and prints CBC, secondary, revision and readers titles. Search KLB books, buy e-books, and enquire about bulk orders or printing services.",
   og_image: "/assets/og-klb.jpg",
 };
 
@@ -33,13 +33,7 @@ export function SiteProvider({ children }) {
   const [loading, setLoading] = useState(!siteCache);
   const [error, setError] = useState(null);
 
-  const reload = useCallback(async (force = false) => {
-    const now = Date.now();
-    if (!force && siteCache && now - siteCacheTime < SITE_CACHE_TTL) {
-      setSite(siteCache);
-      setLoading(false);
-      return siteCache;
-    }
+  const reload = useCallback(async () => {
     try {
       const data = await getSite();
       siteCache = data;

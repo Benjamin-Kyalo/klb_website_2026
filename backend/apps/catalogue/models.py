@@ -1,3 +1,5 @@
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.utils.text import slugify
 
@@ -16,7 +18,7 @@ class Book(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=8, default="KES")
     isbn = models.CharField(max_length=32, blank=True)
-    publisher = models.CharField(max_length=160, default="Kenya Literature Bureau")
+    publisher = models.CharField(max_length=160, default="Kenya Literature Bureau PLC")
     cover = models.CharField(
         max_length=300,
         blank=True,
@@ -28,6 +30,7 @@ class Book(models.Model):
         help_text="Optional upload. Takes precedence over the cover path.",
     )
     description = models.TextField(blank=True)
+    search_vector = SearchVectorField(null=True, blank=True)
     store_url = models.URLField(max_length=500, blank=True)
     source_url = models.URLField(max_length=500, blank=True)
     featured = models.BooleanField(default=False)
@@ -44,12 +47,22 @@ class Book(models.Model):
             models.Index(fields=["collection"]),
             models.Index(fields=["level"]),
             models.Index(fields=["is_published"]),
+            GinIndex(fields=["search_vector"]),
         ]
 
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.title)[:180]
         super().save(*args, **kwargs)
+        # Update search vector for full-text search
+        if self.search_vector is None:
+            from django.contrib.postgres.search import SearchVector
+            Book.objects.filter(pk=self.pk).update(
+                search_vector=SearchVector("title", weight="A")
+                + SearchVector("subject", weight="B")
+                + SearchVector("category", weight="B")
+                + SearchVector("description", weight="C")
+            )
 
     @property
     def cover_url(self) -> str:

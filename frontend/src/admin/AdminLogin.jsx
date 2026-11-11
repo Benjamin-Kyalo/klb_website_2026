@@ -39,7 +39,7 @@ export default function AdminLogin() {
           </span>
           <div>
             <strong>Content manager</strong>
-            <small>Kenya Literature Bureau</small>
+            <small>Kenya Literature Bureau PLC</small>
           </div>
         </div>
         <h1>Staff sign in</h1>

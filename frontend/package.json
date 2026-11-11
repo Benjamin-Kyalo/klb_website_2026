@@ -2,7 +2,7 @@
   "name": "klb-website-frontend",
   "private": true,
   "version": "1.0.0",
-  "description": "React + Vite front end for the Kenya Literature Bureau website",
+  "description": "React + Vite front end for the Kenya Literature Bureau PLC website",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -204,7 +204,7 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
     def seed_settings(self):
         defaults = {
-            "site_name": "Kenya Literature Bureau",
+            "site_name": "Kenya Literature Bureau PLC",
             "tagline": "Publishing & printing for you since 1947",
             "phone": "020 3541196/7",
             "phone_alt": "0711 318 188 · 0732 344 599",
@@ -215,12 +215,12 @@ class Command(BaseCommand):
             "twitter": "https://twitter.com/klb_kenya",
             "ebookstore": "https://klbbooks.com/",
             "footer_blurb": (
-                "Kenya Literature Bureau is a State corporation established in 1947 to publish, "
+                "Kenya Literature Bureau PLC is a State corporation established in 1947 to publish, "
                 "print and distribute educational, cultural and scientific materials for Kenya and the region."
             ),
-            "seo_default_title": "Kenya Literature Bureau | Books, publishing and printing since 1947",
+            "seo_default_title": "Kenya Literature Bureau PLC | Books, publishing and printing since 1947",
             "seo_default_description": (
-                "Kenya Literature Bureau publishes and prints CBC, secondary, revision and readers titles. "
+                "Kenya Literature Bureau PLC publishes and prints CBC, secondary, revision and readers titles. "
                 "Search KLB books, buy e-books, and enquire about bulk orders or printing services."
             ),
             "og_image": "/assets/og-klb.jpg",
@@ -289,7 +289,7 @@ class Command(BaseCommand):
                 "price": Decimal(str(item["price"])) if item.get("price") is not None else None,
                 "currency": item.get("currency", "KES"),
                 "isbn": item.get("isbn") or "",
-                "publisher": item.get("publisher") or "Kenya Literature Bureau",
+                "publisher": item.get("publisher") or "Kenya Literature Bureau PLC",
                 "cover": normalise_cover(item.get("cover", "")),
                 "description": item.get("description", ""),
                 "store_url": item.get("storeUrl") or "",

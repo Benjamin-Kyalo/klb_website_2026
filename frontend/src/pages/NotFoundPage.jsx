@@ -6,7 +6,7 @@ export default function NotFoundPage() {
   return (
     <>
       <Seo
-        title="Page not found | Kenya Literature Bureau"
+        title="Page not found | Kenya Literature Bureau PLC"
         description="The page you requested could not be found. Browse the KLB catalogue, news, resources or contact the team."
         path="/404/"
         noindex

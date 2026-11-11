@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ('price', models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True)),
                 ('currency', models.CharField(default='KES', max_length=8)),
                 ('isbn', models.CharField(blank=True, max_length=32)),
-                ('publisher', models.CharField(default='Kenya Literature Bureau', max_length=160)),
+                ('publisher', models.CharField(default='Kenya Literature Bureau PLC', max_length=160)),
                 ('cover', models.CharField(blank=True, help_text='Public path or absolute URL, e.g. /assets/covers/example.webp', max_length=300)),
                 ('cover_upload', models.FileField(blank=True, help_text='Optional upload. Takes precedence over the cover path.', upload_to='covers/')),
                 ('description', models.TextField(blank=True)),

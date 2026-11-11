@@ -62,7 +62,7 @@ export default function BookDetailPage() {
     return (
       <div className="container page-loading">
         <Seo
-          title="Book not found | Kenya Literature Bureau"
+          title="Book not found | Kenya Literature Bureau PLC"
           description="That book could not be found in the KLB catalogue."
           path={`/books/${slug}/`}
           noindex
@@ -78,7 +78,7 @@ export default function BookDetailPage() {
   }
 
   const collectionLabel = COLLECTION_LABELS[book.collection] || book.collection;
-  const description = `${book.title} — ${book.subject || collectionLabel} for ${book.level || "learners"}, published by Kenya Literature Bureau. View details, price and buying options.`;
+  const description = `${book.title} — ${book.subject || collectionLabel} for ${book.level || "learners"}, published by Kenya Literature Bureau PLC. View details, price and buying options.`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Book",
@@ -88,7 +88,7 @@ export default function BookDetailPage() {
     description: (book.description || "").slice(0, 500),
     isbn: book.isbn || undefined,
     inLanguage: book.language || undefined,
-    publisher: { "@type": "Organization", name: "Kenya Literature Bureau" },
+    publisher: { "@type": "Organization", name: "Kenya Literature Bureau PLC" },
     offers: book.price
       ? {
           "@type": "Offer",
@@ -102,7 +102,7 @@ export default function BookDetailPage() {
 
   return (
     <>
-      <Seo title={`${book.title} | Kenya Literature Bureau`} description={description} path={`/books/${book.slug}/`} jsonLd={jsonLd} />
+      <Seo title={`${book.title} | Kenya Literature Bureau PLC`} description={description} path={`/books/${book.slug}/`} jsonLd={jsonLd} />
 
       <div className="container">
         <nav className="breadcrumbs" aria-label="Breadcrumb" style={{ paddingTop: "1.6rem" }}>
@@ -133,7 +133,7 @@ export default function BookDetailPage() {
               {book.collection} · {book.level}
             </p>
             <h1>{book.title}</h1>
-            <p className="book-detail__sub">{book.subject} · Published by Kenya Literature Bureau</p>
+            <p className="book-detail__sub">{book.subject} · Published by Kenya Literature Bureau PLC</p>
 
             <div className="book-detail__price">
               {book.price ? (
@@ -165,7 +165,7 @@ export default function BookDetailPage() {
             <dl className="meta-list">
               <div>
                 <dt>Publisher</dt>
-                <dd>Kenya Literature Bureau</dd>
+                <dd>Kenya Literature Bureau PLC</dd>
               </div>
               <div>
                 <dt>Collection</dt>

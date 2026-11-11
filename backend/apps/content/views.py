@@ -1,3 +1,4 @@
+import os
 from django.shortcuts import get_object_or_404
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -14,7 +15,7 @@ from apps.catalogue.serializers import BookSerializer
 from apps.enquiries.models import Enquiry, Subscriber
 from apps.enquiries.serializers import EnquirySerializer, SubscriberSerializer
 
-from .models import Career, DigitalPartner, DropdownOption, News, Page, Resource, SiteSetting, TeamPhoto, Tender
+from .models import Career, DigitalPartner, DropdownOption, News, Page, Resource, SiteSetting, TeamPhoto, Tender, WebsiteTheme
 from .serializers import (
     CareerSerializer,
     DigitalPartnerSerializer,
@@ -26,6 +27,7 @@ from .serializers import (
     SiteSettingSerializer,
     TeamPhotoSerializer,
     TenderSerializer,
+    WebsiteThemeSerializer,
 )
 from .team_photos import inject_team_photos, team_members_from_html
 
@@ -98,14 +100,6 @@ class TendersView(APIView):
         return Response(TenderSerializer(qs, many=True).data)
 
 
-class DigitalPartnersView(APIView):
-    """Public list of active digital partners, ordered by sort_order."""
-
-    def get(self, request):
-        qs = DigitalPartner.objects.filter(is_active=True).order_by("sort_order", "name")
-        return Response(DigitalPartnerSerializer(qs, many=True).data)
-
-
 class ResourcesView(APIView):
     def get(self, request):
         qs = Resource.objects.all()
@@ -113,6 +107,30 @@ class ResourcesView(APIView):
         if category:
             qs = qs.filter(category=category)
         return Response(ResourceSerializer(qs, many=True).data)
+
+
+class DigitalPartnersView(APIView):
+    """Public list of active digital partners."""
+
+    def get(self, request):
+        qs = DigitalPartner.objects.filter(is_active=True).order_by("sort_order", "name")
+        return Response(DigitalPartnerSerializer(qs, many=True).data)
+
+
+class ActiveThemeView(APIView):
+    """Return the currently active website theme/campaign, if any."""
+
+    def get(self, request):
+        from django.utils import timezone
+        today = timezone.now().date()
+        theme = WebsiteTheme.objects.filter(
+            is_active=True,
+            start_date__lte=today,
+            end_date__gte=today,
+        ).order_by("-start_date").first()
+        if theme:
+            return Response(WebsiteThemeSerializer(theme).data)
+        return Response({"active": False})
 
 
 # ---------------------------------------------------------------------------
@@ -423,6 +441,234 @@ class AdminDigitalPartnerViewSet(AdminActivityMixin, viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._log(ActivityLog.Action.DELETE, instance, "Digital partner removed.")
         instance.delete()
+
+
+class AdminWebsiteThemeViewSet(AdminActivityMixin, viewsets.ModelViewSet):
+    permission_classes = [ModulePermission]
+    permission_module = "pages"
+    queryset = WebsiteTheme.objects.all().order_by("-start_date", "name")
+    serializer_class = WebsiteThemeSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description"]
+    ordering_fields = ["start_date", "end_date", "name", "is_active"]
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        self._log(ActivityLog.Action.CREATE, obj, "Theme created.")
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        self._log(ActivityLog.Action.UPDATE, obj, "Theme updated.")
+
+    def perform_destroy(self, instance):
+        self._log(ActivityLog.Action.DELETE, instance, "Theme removed.")
+        instance.delete()
+
+
+class AdminBackupView(APIView):
+    permission_classes = [IsStaff]
+
+    def get_permissions(self):
+        return [IsStaff()]
+
+    def post(self, request):
+        backup_type = request.data.get("type", "full")
+        output_dir = settings.BASE_DIR / "backups"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        from io import StringIO
+        out = StringIO()
+        try:
+            if backup_type == "database":
+                call_command("backup", "--database-only", "--output", str(output_dir), stdout=out)
+            elif backup_type == "media":
+                call_command("backup", "--media-only", "--output", str(output_dir), stdout=out)
+            else:
+                call_command("backup", "--output", str(output_dir), stdout=out)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        backups = sorted(output_dir.glob("*.zip"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if backups:
+            latest = backups[0]
+            return Response({
+                "detail": "Backup created successfully.",
+                "filename": latest.name,
+                "size": latest.stat().st_size,
+                "path": str(latest),
+            })
+        return Response({"detail": "Backup completed but no file was created."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminAIDraftView(APIView):
+    permission_classes = [IsStaff]
+
+    def get_permissions(self):
+        return [IsStaff()]
+
+    def post(self, request):
+        api_key = os.getenv("OPENAI_API_KEY", "") or os.getenv("EDENAI_API_KEY", "") or os.getenv("GROQ_API_KEY", "") or os.getenv("GEMINI_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "")
+        if not api_key:
+            return Response(
+                {"detail": "AI API key not configured. Set OPENAI_API_KEY, EDENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY in environment variables."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        topic = (request.data.get("topic") or "").strip()
+        if not topic:
+            return Response({"detail": "Please provide a topic."}, status=status.HTTP_400_BAD_REQUEST)
+
+        import json as _json
+        import urllib.request
+
+        prompt = (
+            "Write a short news article about: " + topic + "\n"
+            "Format: Title: [headline]\nSummary: [1-2 sentences]\nBody: [2-3 paragraphs]"
+        )
+
+        # Free models to try in order (OpenRouter)
+        openrouter_models = [
+            os.getenv("OPENROUTER_MODEL", ""),
+            "liquid/lfm-2.5-2.6b:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "cohere/north-mini-code:free",
+        ]
+        openrouter_models = [m for m in openrouter_models if m]
+
+        is_eden = api_key.startswith("sk-eden-")
+        is_groq = api_key.startswith("gsk_") or api_key.startswith("sgsk_")
+        is_gemini = api_key.startswith("AIza") or api_key.startswith("AQ.")
+        is_openrouter = api_key.startswith("sk-or-")
+
+        if is_eden:
+            models_to_try = [None]
+            url = "https://api.edenai.run/v2/text/chat"
+        elif is_groq:
+            models_to_try = [os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")]
+            url = "https://api.groq.com/openai/v1/chat/completions"
+        elif is_gemini:
+            models_to_try = [os.getenv("GEMINI_MODEL", "gemini-2.0-flash")]
+            url = None
+        elif is_openrouter:
+            models_to_try = openrouter_models
+            url = "https://openrouter.ai/api/v1/chat/completions"
+        else:
+            models_to_try = [os.getenv("OPENAI_MODEL", "gpt-4o-mini")]
+            url = "https://api.openai.com/v1/chat/completions"
+
+        import re as _re
+
+        last_error = None
+        for model in models_to_try:
+            if is_eden:
+                payload = _json.dumps({
+                    "providers": "openai",
+                    "text": prompt,
+                    "temperature": 0.7,
+                    "max_tokens": 500,
+                }).encode("utf-8")
+            elif is_gemini:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                payload = _json.dumps({
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.7, "maxOutputTokens": 500},
+                }).encode("utf-8")
+            else:
+                payload = _json.dumps({
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.7,
+                    "max_tokens": 500,
+                }).encode("utf-8")
+
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": "KLB-Website/1.0",
+                },
+            )
+
+            try:
+                resp = urllib.request.urlopen(req, timeout=30)
+                raw_body = resp.read()
+                resp.close()
+                if not raw_body:
+                    last_error = f"Model {model}: empty response"
+                    continue
+                result = _json.loads(raw_body.decode("utf-8"))
+
+                if is_eden:
+                    provider_result = result.get("openai", {})
+                    content = provider_result.get("generated_text", "")
+                    if not content:
+                        content = str(result)
+                elif is_gemini:
+                    candidates = result.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        content = parts[0].get("text", "") if parts else ""
+                    if not content:
+                        content = str(result)
+                else:
+                    content = result["choices"][0]["message"].get("content") or ""
+                    if not content:
+                        content = result["choices"][0]["message"].get("reasoning", "")
+                    if not content:
+                        content = str(result)
+
+                # Try to extract JSON from the content (even if mixed with reasoning)
+                json_match = _re.search(r'\{[^{}]*"title"[^{}]*"summary"[^{}]*"body_html"[^{}]*\}', content, _re.DOTALL)
+                if json_match:
+                    try:
+                        draft = _json.loads(json_match.group(0))
+                        if isinstance(draft, dict) and "title" in draft:
+                            return Response({"draft": draft, "model_used": model})
+                    except _json.JSONDecodeError:
+                        pass
+
+                # Try to find any JSON object in the content
+                json_match2 = _re.search(r'\{.*\}', content, _re.DOTALL)
+                if json_match2:
+                    try:
+                        draft = _json.loads(json_match2.group(0))
+                        if isinstance(draft, dict) and "title" in draft:
+                            return Response({"draft": draft, "model_used": model})
+                    except _json.JSONDecodeError:
+                        pass
+
+                # Check if content is just echoing the prompt
+                echo_indicators = ["Return ONLY", "Topic:", "your headline", "your paragraph", "We need to produce", "The user wants", "JSON format", "150-250 words", "no placeholder"]
+                is_echo = any(indicator in content for indicator in echo_indicators)
+                if is_echo:
+                    last_error = f"Model {model} echoed prompt"
+                    continue
+
+                # If we got content but not valid JSON, wrap it
+                if content and len(content) > 50:
+                    draft = {
+                        "title": topic,
+                        "summary": content[:200],
+                        "body_html": f"<p>{content}</p>",
+                    }
+                    return Response({"draft": draft, "model_used": model})
+
+                last_error = f"Model {model} returned unusable content"
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode("utf-8", errors="replace")
+                last_error = f"Model {model}: {error_body[:100]}"
+                continue
+            except Exception as e:
+                last_error = f"Model {model}: {str(e)}"
+                continue
+
+        # All models failed
+        return Response(
+            {"detail": f"All AI models failed. Last error: {last_error}. Try again later or use a different API key."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
 
 class AdminEnquiryViewSet(AdminActivityMixin, viewsets.ModelViewSet):

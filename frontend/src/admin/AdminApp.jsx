@@ -17,6 +17,8 @@ const AdminOptions = lazy(() => import("./AdminOptions.jsx"));
 const AdminAccount = lazy(() => import("./AdminAccount.jsx"));
 const AdminTeamPhotos = lazy(() => import("./AdminTeamPhotos.jsx"));
 const AdminDigitalPartners = lazy(() => import("./AdminDigitalPartners.jsx"));
+const AdminBackup = lazy(() => import("./AdminBackup.jsx"));
+const AdminThemes = lazy(() => import("./AdminThemes.jsx"));
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -108,6 +110,8 @@ export default function AdminApp() {
       <Route path="options" element={<Page module="options"><LazyPage><AdminOptions /></LazyPage></Page>} />
       <Route path="team-photos" element={<Page module="pages"><LazyPage><AdminTeamPhotos /></LazyPage></Page>} />
       <Route path="digital-partners" element={<Page module="pages"><LazyPage><AdminDigitalPartners /></LazyPage></Page>} />
+      <Route path="backup" element={<Page module="pages"><LazyPage><AdminBackup /></LazyPage></Page>} />
+      <Route path="themes" element={<Page module="pages"><LazyPage><AdminThemes /></LazyPage></Page>} />
       <Route
         path="account"
         element={

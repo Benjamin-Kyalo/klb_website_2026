@@ -1,6 +1,6 @@
 # KLB website
 
-A complete website for the Kenya Literature Bureau: a public catalogue and
+A complete website for the Kenya Literature Bureau PLC: a public catalogue and
 content site, plus a staff dashboard for editing every public page, book, news
 item, tender, career, resource and global setting.
 

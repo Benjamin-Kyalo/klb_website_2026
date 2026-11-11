@@ -88,7 +88,7 @@ class Migration(migrations.Migration):
             name='SiteSetting',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('site_name', models.CharField(default='Kenya Literature Bureau', max_length=160)),
+                ('site_name', models.CharField(default='Kenya Literature Bureau PLC', max_length=160)),
                 ('tagline', models.CharField(blank=True, max_length=200)),
                 ('phone', models.CharField(blank=True, max_length=80)),
                 ('phone_alt', models.CharField(blank=True, max_length=120)),

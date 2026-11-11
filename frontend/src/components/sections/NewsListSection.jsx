@@ -59,7 +59,7 @@ export default function NewsListSection({ section }) {
                 </div>
                 <div className="news-list__body">
                   <h3>{item.title}</h3>
-                  <p>{item.summary || "Announcement from Kenya Literature Bureau."}</p>
+                  <p>{item.summary || "Announcement from Kenya Literature Bureau PLC."}</p>
                   <span className="link-arrow">
                     Read announcement <Arrow />
                   </span>

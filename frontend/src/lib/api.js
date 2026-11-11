@@ -45,7 +45,13 @@ export function buildQuery(params = {}) {
 
 function extractError(data, status) {
   if (!data) return new ApiError(`Request failed (${status}).`, status);
-  if (typeof data === "string") return new ApiError(data, status);
+  if (typeof data === "string") {
+    // If the response is HTML (e.g., server error page), return a clean message
+    if (data.includes("<!doctype") || data.includes("<html")) {
+      return new ApiError("An unexpected error occurred. Please try again later.", status);
+    }
+    return new ApiError(data, status);
+  }
   const fields = data.errors || null;
   if (fields) {
     const firstKey = Object.keys(fields)[0];
@@ -61,6 +67,7 @@ export async function api(path, { method = "GET", body, headers = {}, raw = fals
     method,
     credentials: "include",
     headers: { Accept: "application/json", ...headers },
+    cache: "no-store",
   };
 
   if (body !== undefined && body !== null) {
@@ -107,8 +114,11 @@ export const getNewsItem = (slug) => api(`/news/${encodeURIComponent(slug)}/`);
 export const getCareers = (params = {}) => api(`/careers/${buildQuery(params)}`);
 export const getTenders = (params = {}) => api(`/tenders/${buildQuery(params)}`);
 export const getResources = (params = {}) => api(`/resources/${buildQuery(params)}`);
+export const getDigitalPartners = () => api("/digital-partners/");
+export const getActiveTheme = () => api("/themes/active/");
 export const sendEnquiry = (payload) => api("/enquiries/", { method: "POST", body: payload });
 export const subscribe = (email) => api("/newsletter/", { method: "POST", body: { email } });
+export const unsubscribe = (email) => api("/newsletter/unsubscribe/", { method: "POST", body: { email } });
 
 // ---------------------------------------------------------------------------
 // Authentication
@@ -191,6 +201,15 @@ export const admin = {
     create: (payload) => api("/admin/digital-partners/", { method: "POST", body: payload }),
     update: (id, payload) => api(`/admin/digital-partners/${id}/`, { method: "PATCH", body: payload }),
     remove: (id) => api(`/admin/digital-partners/${id}/`, { method: "DELETE" }),
+  },
+  backup: (type = "full") => api("/admin/backup/", { method: "POST", body: { type } }),
+  aiDraft: (topic) => api("/admin/ai-draft/", { method: "POST", body: { topic } }),
+  themes: {
+    list: (params = {}) => api(`/admin/themes/${buildQuery(params)}`),
+    get: (id) => api(`/admin/themes/${id}/`),
+    create: (payload) => api("/admin/themes/", { method: "POST", body: payload }),
+    update: (id, payload) => api(`/admin/themes/${id}/`, { method: "PATCH", body: payload }),
+    remove: (id) => api(`/admin/themes/${id}/`, { method: "DELETE" }),
   },
 };
 

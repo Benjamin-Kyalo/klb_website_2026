@@ -193,13 +193,13 @@ export default function PageView({ slug }) {
       ? {
           "@context": "https://schema.org",
           "@type": "Organization",
-          name: "Kenya Literature Bureau",
+          name: "Kenya Literature Bureau PLC",
           alternateName: "KLB",
           url: SITE_URL,
           logo: `${SITE_URL}/assets/klb-lockup.png`,
           foundingDate: "1947",
           description:
-            "Kenya Literature Bureau is a State corporation that publishes, prints and distributes educational, cultural and scientific books, periodicals and digital materials.",
+            "Kenya Literature Bureau PLC is a State corporation that publishes, prints and distributes educational, cultural and scientific books, periodicals and digital materials.",
           address: {
             "@type": "PostalAddress",
             streetAddress: settings.address,

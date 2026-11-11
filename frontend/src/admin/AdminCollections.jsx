@@ -35,7 +35,7 @@ const bookFields = [
   { name: "price", label: "Price", type: "number", step: "0.01", min: "0" },
   { name: "currency", label: "Currency", defaultValue: "KES" },
   { name: "isbn", label: "ISBN" },
-  { name: "publisher", label: "Publisher", defaultValue: "Kenya Literature Bureau" },
+  { name: "publisher", label: "Publisher", defaultValue: "Kenya Literature Bureau PLC" },
   { name: "sort_order", label: "Sort order", type: "number", min: "0", defaultValue: 0 },
   { name: "cover", label: "Cover image", type: "file", accept: "image/*", full: true, hint: "Paste a path such as /assets/covers/title.webp or upload a new image." },
   { name: "description", label: "Description", type: "textarea", rows: 5, full: true },
@@ -90,7 +90,7 @@ export function AdminBooks() {
       defaults={{
         collection: "CBC",
         currency: "KES",
-        publisher: "Kenya Literature Bureau",
+        publisher: "Kenya Literature Bureau PLC",
         is_published: true,
         sort_order: 0,
       }}
@@ -159,6 +159,7 @@ export function AdminNews() {
       fields={newsFields}
       lookupField="slug"
       searchPlaceholder="Search news…"
+      enableAIDraft={true}
       defaults={{ status: "published", featured: false }}
     />
   );
@@ -190,6 +191,7 @@ const careerFields = [
     optionsGroup: "employment_type",
     allowOther: true,
   },
+  { name: "opening_date", label: "Opening date", type: "date", hint: "Leave blank to open immediately." },
   { name: "closing_date", label: "Closing date", type: "date" },
   { name: "apply_url", label: "Application URL", full: true, hint: "Link to the KLB e-recruitment portal." },
   { name: "summary", label: "Summary", type: "textarea", rows: 3, full: true },
@@ -203,7 +205,7 @@ const careerColumns = [
   { key: "department", label: "Department" },
   { key: "location", label: "Location" },
   { key: "closing_date", label: "Closes", render: (row) => (row.closing_date ? formatDate(row.closing_date) : "—") },
-  { key: "is_open", label: "Status", render: (row) => <StatusBadge status={row.is_open ? "published" : "draft"} /> },
+  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status === "expired" ? "draft" : row.status === "closing_soon" ? "new" : "published"} /> },
 ];
 
 export function AdminCareers() {
@@ -235,6 +237,7 @@ const tenderFields = [
     allowOther: true,
   },
   { name: "published_on", label: "Published date", type: "date" },
+  { name: "opening_date", label: "Opening date", type: "date", hint: "Leave blank to open immediately." },
   { name: "closing_date", label: "Closing date", type: "date" },
   { name: "document_url", label: "Tender document", type: "file", accept: "application/pdf", full: true, hint: "Upload a PDF or paste a path." },
   { name: "summary", label: "Summary", type: "textarea", rows: 3, full: true },
@@ -248,7 +251,7 @@ const tenderColumns = [
   { key: "category", label: "Category" },
   { key: "published_on", label: "Published", render: (row) => (row.published_on ? formatDate(row.published_on) : "—") },
   { key: "closing_date", label: "Closing", render: (row) => (row.closing_date ? formatDate(row.closing_date) : "—") },
-  { key: "is_open", label: "Status", render: (row) => <StatusBadge status={row.is_open ? "published" : "draft"} /> },
+  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status === "expired" ? "draft" : row.status === "closing_soon" ? "new" : "published"} /> },
 ];
 
 export function AdminTenders() {

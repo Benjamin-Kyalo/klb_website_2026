@@ -64,7 +64,25 @@ Important Render limits that affect this project:
 - Free web services have no persistent disk, so anything written to `backend/media/` (team photos, covers, PDFs uploaded through the dashboard) is lost on the next deploy or restart.
 - Production needs a paid web service with a persistent disk mounted at `MEDIA_ROOT`.
 
-## 2. Create the PostgreSQL database
+## Supabase database (alternative to Render Postgres)
+
+If you are using Supabase instead of Render Postgres:
+
+1. Go to your Supabase project → **Settings** → **Database**.
+2. Copy the **Connection string** (URI format), NOT the "Connection pooling" string or the REST API URL.
+3. It looks like:
+   ```
+   postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres?sslmode=require
+   ```
+4. In Render, set `DATABASE_URL` to this string.
+5. **Important:** Do NOT use the Supabase REST API URL (which starts with `https://`). The `DATABASE_URL` must start with `postgresql://` or `postgres://`.
+
+### Common Supabase mistakes
+
+- **Wrong URL:** Using `https://[PROJECT-REF].supabase.co` instead of the PostgreSQL connection string. This causes `ValueError: No support for 'https'`.
+- **Missing password:** The connection string contains `[YOUR-PASSWORD]` placeholder. Replace it with your actual database password.
+- **Wrong port:** Use port `5432` (direct) not `6543` (pooler) unless you need connection pooling.
+- **Missing sslmode:** Add `?sslmode=require` to the end of the connection string. Supabase requires SSL.
 
 1. In the Render dashboard, click **New +** -> **PostgreSQL**.
 2. Use these values:
@@ -182,7 +200,7 @@ On the Free plan there is no disk. Uploads still work during a session but disap
 
    ```text
    Seed complete:
-     settings: Kenya Literature Bureau
+     settings: Kenya Literature Bureau PLC
      pages: 12
      books: 128
      news: 21

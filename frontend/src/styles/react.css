@@ -145,7 +145,39 @@
   margin-top: 0.5rem;
 }
 
-/* ---------- Book card skeleton ---------- */
+/* ---------- Improved loading and transitions ---------- */
+.klb-loading {
+  animation: klb-fade-in 0.3s ease;
+}
+
+@keyframes klb-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-transition {
+  animation: klb-page-in 0.25s ease;
+}
+
+@keyframes klb-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-draft-filled {
+  animation: klb-highlight 1.2s ease;
+}
+
+@keyframes klb-highlight {
+  0% { background: var(--yellow, #f3e5ab); }
+  100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .klb-loading, .page-transition, .ai-draft-filled {
+    animation: none !important;
+  }
+}
 .book-card--skeleton {
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-xs);

@@ -1,3 +1,17 @@
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+
+def custom_500_handler(request, exception=None):
+    """Return JSON error for API requests, HTML for others."""
+    if request.path.startswith("/api/"):
+        return JsonResponse(
+            {"detail": "An unexpected error occurred. Please try again later."},
+            status=500,
+        )
+    # Fall back to default 500 page for non-API requests
+    from django.views.defaults import server_error
+    return server_error(request)
 from django.conf import settings
 from django.urls import include, path, re_path
 from django.views.static import serve as serve_media
@@ -15,6 +29,8 @@ from apps.accounts.views import (
 )
 from apps.catalogue.views import BookViewSet, CatalogueFiltersView
 from apps.content.views import (
+    AdminAIDraftView,
+    AdminBackupView,
     AdminBookViewSet,
     AdminCareerViewSet,
     AdminDigitalPartnerViewSet,
@@ -28,6 +44,8 @@ from apps.content.views import (
     AdminSubscriberViewSet,
     AdminTeamPhotoView,
     AdminTenderViewSet,
+    AdminWebsiteThemeViewSet,
+    ActiveThemeView,
     CareersView,
     DigitalPartnersView,
     NewsViewSet,
@@ -36,7 +54,7 @@ from apps.content.views import (
     SiteView,
     TendersView,
 )
-from apps.enquiries.views import NewsletterView, PublicEnquiryView
+from apps.enquiries.views import NewsletterView, PublicEnquiryView, UnsubscribeView
 from apps.content.uploads import MediaUploadView
 
 from .views import health, robots_txt, serve_spa, sitemap_xml
@@ -80,16 +98,22 @@ urlpatterns = [
     path("api/tenders/", TendersView.as_view(), name="tenders"),
     path("api/resources/", ResourcesView.as_view(), name="resources"),
     path("api/digital-partners/", DigitalPartnersView.as_view(), name="digital-partners"),
+    path("api/themes/active/", ActiveThemeView.as_view(), name="active-theme"),
 
     # Public forms
     path("api/enquiries/", PublicEnquiryView.as_view(), name="enquiries"),
     path("api/newsletter/", NewsletterView.as_view(), name="newsletter"),
+    path("api/newsletter/unsubscribe/", UnsubscribeView.as_view(), name="newsletter-unsubscribe"),
 
     # Dashboard
     path("api/admin/stats/", AdminStatsView.as_view(), name="admin-stats"),
     path("api/admin/settings/", AdminSiteSettingView.as_view(), name="admin-settings"),
     path("api/admin/permissions/", PermissionMetaView.as_view(), name="admin-permissions"),
     path("api/admin/upload/", MediaUploadView.as_view(), name="admin-upload"),
+    path("api/admin/ai-draft/", AdminAIDraftView.as_view(), name="admin-ai-draft"),
+    path("api/admin/themes/", AdminWebsiteThemeViewSet.as_view({"get": "list", "post": "create"}), name="admin-themes"),
+    path("api/admin/themes/<int:pk>/", AdminWebsiteThemeViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}), name="admin-theme"),
+    path("api/admin/backup/", AdminBackupView.as_view(), name="admin-backup"),
     path("api/admin/digital-partners/", AdminDigitalPartnerViewSet.as_view({"get": "list", "post": "create"}), name="admin-digital-partners"),
     path("api/admin/digital-partners/<int:pk>/", AdminDigitalPartnerViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}), name="admin-digital-partner"),
     path("api/admin/team-photos/", AdminTeamPhotoView.as_view(), name="admin-team-photos"),
@@ -112,9 +136,4 @@ urlpatterns += [
     re_path(r"^media/(?P<path>.*)$", serve_media, {"document_root": settings.MEDIA_ROOT}),
 ]
 
-# Everything else is the React single-page application. API, static and media
-# requests are excluded so that missing files still return a real 404 rather
-# than the app shell.
-urlpatterns += [
-    re_path(r"^(?P<path>(?!api/|static/|media/).*)$", serve_spa, name="spa"),
-]
+handler500 = custom_500_handler

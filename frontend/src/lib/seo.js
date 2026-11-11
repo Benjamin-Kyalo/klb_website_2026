@@ -27,7 +27,7 @@ export default function Seo({
   noindex = false,
 }) {
   useEffect(() => {
-    const fullTitle = title || "Kenya Literature Bureau";
+    const fullTitle = title || "Kenya Literature Bureau PLC";
     const url = `${SITE_URL}${path}`;
     document.title = fullTitle;
 

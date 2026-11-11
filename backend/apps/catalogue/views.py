@@ -1,3 +1,4 @@
+from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.db.models import Q
 from rest_framework import filters, viewsets
 from rest_framework.response import Response
@@ -39,15 +40,24 @@ class BookViewSet(viewsets.ReadOnlyModelViewSet):
 
         search = (params.get("q") or "").strip()
         if search:
-            terms = [term for term in search.split() if term]
-            for term in terms:
-                qs = qs.filter(
-                    Q(title__icontains=term)
-                    | Q(subject__icontains=term)
-                    | Q(description__icontains=term)
-                    | Q(isbn__icontains=term)
-                    | Q(category__icontains=term)
-                )
+            # Use PostgreSQL full-text search when available, fall back to icontains
+            try:
+                search_query = SearchQuery(search, search_type="websearch")
+                qs = qs.annotate(rank=SearchRank("search_vector", search_query)).filter(search_vector=search_query)
+                # Order by relevance when searching
+                if not params.get("ordering"):
+                    qs = qs.order_by("-rank", "-featured", "sort_order", "title")
+            except Exception:
+                # Fallback for non-PostgreSQL databases (e.g., SQLite in tests)
+                terms = [term for term in search.split() if term]
+                for term in terms:
+                    qs = qs.filter(
+                        Q(title__icontains=term)
+                        | Q(subject__icontains=term)
+                        | Q(description__icontains=term)
+                        | Q(isbn__icontains=term)
+                        | Q(category__icontains=term)
+                    )
 
         return qs
 

@@ -267,7 +267,7 @@ export default function Header() {
         aria-label="Mobile navigation"
       >
         <div className="mobile-nav-head">
-          <Link className="brand" to="/" aria-label="Kenya Literature Bureau home">
+          <Link className="brand" to="/" aria-label="Kenya Literature Bureau PLC home">
             <span className="brand-mark">
               <img src="/assets/klb-emblem.png" alt="" width="482" height="482" />
             </span>

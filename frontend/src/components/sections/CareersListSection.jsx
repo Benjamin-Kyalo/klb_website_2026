@@ -55,16 +55,27 @@ export default function CareersListSection({ section }) {
               const meta = [job.location, job.employment_type, job.closing_date ? `Closes ${formatDate(job.closing_date)}` : ""]
                 .filter(Boolean)
                 .join(" · ");
+              const expired = job.status === "expired";
+              const closingSoon = job.status === "closing_soon";
               return (
-                <a className="job" href={job.apply_url || "https://recruitment.klb.co.ke"} rel="noopener" key={job.id}>
+                <a className={`job${expired ? " job--expired" : ""}`} href={expired ? undefined : (job.apply_url || "https://recruitment.klb.co.ke")} rel="noopener" key={job.id} onClick={expired ? (e) => e.preventDefault() : undefined} style={expired ? { pointerEvents: "none", opacity: 0.7 } : undefined}>
                   <div>
                     <span className="tender__tag">{job.department || "Opportunity"}</span>
                     <h3>{job.title}</h3>
                     <p>{job.summary}</p>
                     {meta ? <p className="muted-meta">{meta}</p> : null}
+                    {expired ? (
+                      <p className="muted-meta" style={{ color: "var(--red, #b32632)", fontWeight: 600 }}>
+                        This vacancy has closed.
+                      </p>
+                    ) : closingSoon ? (
+                      <p className="muted-meta" style={{ color: "var(--yellow, #7b5a10)", fontWeight: 600 }}>
+                        Closing soon — apply before {formatDate(job.closing_date)}.
+                      </p>
+                    ) : null}
                   </div>
                   <span className="link-arrow">
-                    Apply online <Arrow />
+                    {expired ? "Closed" : "Apply online"} <Arrow />
                   </span>
                 </a>
               );
