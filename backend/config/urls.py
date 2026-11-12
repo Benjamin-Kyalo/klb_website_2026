@@ -29,8 +29,8 @@ from apps.accounts.views import (
 )
 from apps.catalogue.views import BookViewSet, CatalogueFiltersView
 from apps.content.views import (
-    AdminAIDraftView,
     AdminBackupView,
+    AdminAIDraftView,
     AdminBookViewSet,
     AdminCareerViewSet,
     AdminDigitalPartnerViewSet,

@@ -1,4 +1,7 @@
 import os
+import re
+from django.conf import settings
+from django.core.management import call_command
 from django.shortcuts import get_object_or_404
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -110,23 +113,17 @@ class ResourcesView(APIView):
 
 
 class DigitalPartnersView(APIView):
-    """Public list of active digital partners."""
-
     def get(self, request):
         qs = DigitalPartner.objects.filter(is_active=True).order_by("sort_order", "name")
         return Response(DigitalPartnerSerializer(qs, many=True).data)
 
 
 class ActiveThemeView(APIView):
-    """Return the currently active website theme/campaign, if any."""
-
     def get(self, request):
         from django.utils import timezone
         today = timezone.now().date()
         theme = WebsiteTheme.objects.filter(
-            is_active=True,
-            start_date__lte=today,
-            end_date__gte=today,
+            is_active=True, start_date__lte=today, end_date__gte=today,
         ).order_by("-start_date").first()
         if theme:
             return Response(WebsiteThemeSerializer(theme).data)
@@ -522,132 +519,137 @@ class AdminAIDraftView(APIView):
         import urllib.request
 
         prompt = (
-            "Write a short news article about: " + topic + "\n"
-            "Format: Title: [headline]\nSummary: [1-2 sentences]\nBody: [2-3 paragraphs]"
+            "Write a short news article for Kenya Literature Bureau PLC about: " + topic + ". "
+            "Return ONLY valid JSON with these fields: "
+            '{"title": "headline", "summary": "1-2 sentences", "body_html": "<p>paragraph1</p><p>paragraph2</p>"} '
+            "The article should be 150-250 words total. Use professional language. "
+            "No placeholder text. No explanations outside JSON. Output only the JSON object."
         )
-
-        # Free models to try in order (OpenRouter)
-        openrouter_models = [
-            os.getenv("OPENROUTER_MODEL", ""),
-            "liquid/lfm-2.5-2.6b:free",
-            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-            "cohere/north-mini-code:free",
-        ]
-        openrouter_models = [m for m in openrouter_models if m]
 
         is_eden = api_key.startswith("sk-eden-")
         is_groq = api_key.startswith("gsk_") or api_key.startswith("sgsk_")
         is_gemini = api_key.startswith("AIza") or api_key.startswith("AQ.")
         is_openrouter = api_key.startswith("sk-or-")
+        model = None
 
         if is_eden:
-            models_to_try = [None]
             url = "https://api.edenai.run/v2/text/chat"
+            payload = _json.dumps({
+                "providers": "openai",
+                "text": prompt,
+                "temperature": 0.7,
+                "max_tokens": 500,
+            }).encode("utf-8")
         elif is_groq:
-            models_to_try = [os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")]
+            model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
             url = "https://api.groq.com/openai/v1/chat/completions"
+            payload = _json.dumps({
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 500,
+            }).encode("utf-8")
         elif is_gemini:
-            models_to_try = [os.getenv("GEMINI_MODEL", "gemini-2.0-flash")]
-            url = None
+            model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = _json.dumps({
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 500},
+            }).encode("utf-8")
         elif is_openrouter:
-            models_to_try = openrouter_models
+            model = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
             url = "https://openrouter.ai/api/v1/chat/completions"
+            payload = _json.dumps({
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 500,
+                "reasoning": {"effort": "none"},
+            }).encode("utf-8")
         else:
-            models_to_try = [os.getenv("OPENAI_MODEL", "gpt-4o-mini")]
+            model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
             url = "https://api.openai.com/v1/chat/completions"
+            payload = _json.dumps({
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 500,
+            }).encode("utf-8")
 
-        import re as _re
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": "KLB-Website/1.0",
+            },
+        )
 
-        last_error = None
-        for model in models_to_try:
-            if is_eden:
-                payload = _json.dumps({
-                    "providers": "openai",
-                    "text": prompt,
-                    "temperature": 0.7,
-                    "max_tokens": 500,
-                }).encode("utf-8")
-            elif is_gemini:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                payload = _json.dumps({
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.7, "maxOutputTokens": 500},
-                }).encode("utf-8")
-            else:
-                payload = _json.dumps({
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.7,
-                    "max_tokens": 500,
-                }).encode("utf-8")
-
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {api_key}",
-                    "User-Agent": "KLB-Website/1.0",
-                },
-            )
-
-            try:
-                resp = urllib.request.urlopen(req, timeout=30)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
                 raw_body = resp.read()
-                resp.close()
                 if not raw_body:
-                    last_error = f"Model {model}: empty response"
-                    continue
+                    return Response(
+                        {"detail": "AI service returned an empty response. Try a different model or try again later."},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
                 result = _json.loads(raw_body.decode("utf-8"))
+            if is_eden:
+                provider_result = result.get("openai", {})
+                content = provider_result.get("generated_text", "")
+                if not content:
+                    content = str(result)
+            elif is_gemini:
+                candidates = result.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    content = parts[0].get("text", "") if parts else ""
+                if not content:
+                    content = str(result)
+            else:
+                msg = result["choices"][0]["message"]
+                content = msg.get("content") or ""
+                if not content:
+                    reasoning_val = msg.get("reasoning")
+                    if reasoning_val:
+                        content = reasoning_val
+                if not content:
+                    content = str(result)
 
-                if is_eden:
-                    provider_result = result.get("openai", {})
-                    content = provider_result.get("generated_text", "")
-                    if not content:
-                        content = str(result)
-                elif is_gemini:
-                    candidates = result.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        content = parts[0].get("text", "") if parts else ""
-                    if not content:
-                        content = str(result)
-                else:
-                    content = result["choices"][0]["message"].get("content") or ""
-                    if not content:
-                        content = result["choices"][0]["message"].get("reasoning", "")
-                    if not content:
-                        content = str(result)
-
-                # Try to extract JSON from the content (even if mixed with reasoning)
-                json_match = _re.search(r'\{[^{}]*"title"[^{}]*"summary"[^{}]*"body_html"[^{}]*\}', content, _re.DOTALL)
+            # Try to parse JSON from the content
+            try:
+                clean = content.strip()
+                # Look for JSON object in the content (handles markdown wrapping)
+                json_match = re.search(r'\{.*"title".*"summary".*"body_html".*\}', clean, re.DOTALL)
                 if json_match:
-                    try:
-                        draft = _json.loads(json_match.group(0))
-                        if isinstance(draft, dict) and "title" in draft:
-                            return Response({"draft": draft, "model_used": model})
-                    except _json.JSONDecodeError:
-                        pass
+                    clean = json_match.group(0)
+                elif clean.startswith("```"):
+                    clean = clean.split("```")[1]
+                    if clean.startswith("json"):
+                        clean = clean[4:]
+                    clean = clean.strip()
+                draft = _json.loads(clean)
+                if isinstance(draft, dict) and "title" in draft:
+                    draft_title = str(draft.get("title", ""))
+                    draft_summary = str(draft.get("summary", ""))
+                    # Only accept if it has real content (not just echoing the prompt)
+                    if len(draft_summary) > 10:
+                        return Response({"draft": draft, "model_used": model})
+            except (_json.JSONDecodeError, Exception):
+                pass
 
-                # Try to find any JSON object in the content
-                json_match2 = _re.search(r'\{.*\}', content, _re.DOTALL)
-                if json_match2:
-                    try:
-                        draft = _json.loads(json_match2.group(0))
-                        if isinstance(draft, dict) and "title" in draft:
-                            return Response({"draft": draft, "model_used": model})
-                    except _json.JSONDecodeError:
-                        pass
-
-                # Check if content is just echoing the prompt
-                echo_indicators = ["Return ONLY", "Topic:", "your headline", "your paragraph", "We need to produce", "The user wants", "JSON format", "150-250 words", "no placeholder"]
-                is_echo = any(indicator in content for indicator in echo_indicators)
-                if is_echo:
-                    last_error = f"Model {model} echoed prompt"
-                    continue
-
-                # If we got content but not valid JSON, wrap it
-                if content and len(content) > 50:
+            # If we got content but not valid JSON, wrap it as a draft
+            if content and len(content) > 50:
+                # Check if content is just echoing the prompt or reasoning
+                echo_phrases = [
+                    "analyze the request", "constraints:", "output:", "the user wants",
+                    "we need to", "requirements:", "return only", "topic:",
+                    "your headline", "your paragraph", "we need to produce",
+                    "json format", "150-250 words", "no placeholder", "no explanations",
+                ]
+                is_echo = any(phrase in content.lower() for phrase in echo_phrases)
+                if not is_echo:
                     draft = {
                         "title": topic,
                         "summary": content[:200],
@@ -655,20 +657,26 @@ class AdminAIDraftView(APIView):
                     }
                     return Response({"draft": draft, "model_used": model})
 
-                last_error = f"Model {model} returned unusable content"
-            except urllib.error.HTTPError as e:
-                error_body = e.read().decode("utf-8", errors="replace")
-                last_error = f"Model {model}: {error_body[:100]}"
-                continue
-            except Exception as e:
-                last_error = f"Model {model}: {str(e)}"
-                continue
-
-        # All models failed
-        return Response(
-            {"detail": f"All AI models failed. Last error: {last_error}. Try again later or use a different API key."},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
+            return Response(
+                {"detail": "AI service returned insufficient content. Try a different model."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8", errors="replace")
+            if "UNAUTHENTICATED" in error_body or "API keys are not supported" in error_body:
+                return Response(
+                    {"detail": "Your API key is not a valid Gemini key. Get a new key from https://aistudio.google.com/apikey (should start with 'AIza')."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {"detail": f"AI API error: {error_body[:300]}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Failed to generate draft: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class AdminEnquiryViewSet(AdminActivityMixin, viewsets.ModelViewSet):
