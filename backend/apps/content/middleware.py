@@ -26,11 +26,11 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
         if not django_settings.DEBUG:
             csp = (
                 "default-src 'self'; "
-                "script-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://code.tidio.co https://*.tidio.co; "
                 "style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: https:; "
-                "font-src 'self'; "
-                "connect-src 'self'; "
+                "font-src 'self' data:; "
+                "connect-src 'self' https://code.tidio.co https://*.tidio.co wss://*.tidio.co; "
                 "frame-ancestors 'none';"
             )
             response["Content-Security-Policy"] = csp
