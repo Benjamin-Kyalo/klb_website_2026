@@ -505,6 +505,7 @@ class AdminAIDraftView(APIView):
 
     def post(self, request):
         api_key = os.getenv("OPENAI_API_KEY", "") or os.getenv("EDENAI_API_KEY", "") or os.getenv("GROQ_API_KEY", "") or os.getenv("GEMINI_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "")
+        api_key = api_key.strip()
         if not api_key:
             return Response(
                 {"detail": "AI API key not configured. Set OPENAI_API_KEY, EDENAI_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY in environment variables."},

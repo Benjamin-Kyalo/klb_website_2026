@@ -85,7 +85,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 _database_url = os.getenv(
     "DATABASE_URL",
     "postgres://klb:klb_dev_password@127.0.0.1:5432/klb",
-)
+).strip()
 if _database_url.startswith("https://") or _database_url.startswith("http://"):
     raise RuntimeError(
         "DATABASE_URL must be a PostgreSQL connection string, not an HTTP URL. "
