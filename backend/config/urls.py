@@ -136,4 +136,9 @@ urlpatterns += [
     re_path(r"^media/(?P<path>.*)$", serve_media, {"document_root": settings.MEDIA_ROOT}),
 ]
 
+# SPA fallback: serve the built React app for all non-API, non-media routes.
+urlpatterns += [
+    re_path(r"^(?P<path>.*)$", serve_spa, name="spa"),
+]
+
 handler500 = custom_500_handler
