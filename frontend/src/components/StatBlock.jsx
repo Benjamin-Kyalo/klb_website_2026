@@ -17,14 +17,16 @@ function parseValue(raw) {
   return { number, suffix: match[2] || "" };
 }
 
-function CountUp({ value, suffix, animate }) {
+function CountUp({ value, suffix, animate, index }) {
   const [display, setDisplay] = useState(animate ? 0 : value);
+  const [done, setDone] = useState(!animate);
   const ref = useRef(null);
   const started = useRef(false);
 
   useEffect(() => {
     if (!animate) {
       setDisplay(value);
+      setDone(true);
       return undefined;
     }
     const node = ref.current;
@@ -37,6 +39,7 @@ function CountUp({ value, suffix, animate }) {
 
     if (prefersReduced) {
       setDisplay(value);
+      setDone(true);
       return undefined;
     }
 
@@ -45,13 +48,17 @@ function CountUp({ value, suffix, animate }) {
         entries.forEach((entry) => {
           if (entry.isIntersecting && !started.current) {
             started.current = true;
-            const duration = 1400;
+            const duration = 1500;
             const start = performance.now();
             const tick = (now) => {
               const progress = Math.min((now - start) / duration, 1);
               const eased = 1 - Math.pow(1 - progress, 3);
               setDisplay(Math.round(eased * value));
-              if (progress < 1) requestAnimationFrame(tick);
+              if (progress < 1) {
+                requestAnimationFrame(tick);
+              } else {
+                setDone(true);
+              }
             };
             requestAnimationFrame(tick);
             observer.disconnect();
@@ -66,9 +73,14 @@ function CountUp({ value, suffix, animate }) {
   }, [value, animate]);
 
   return (
-    <span ref={ref} className="stat-block__value">
+    <span
+      ref={ref}
+      className={`stat-block__value${done ? " is-done" : ""}`}
+      style={{ transitionDelay: `${(index || 0) * 80}ms` }}
+    >
       {display.toLocaleString()}
       {suffix}
+      <span className="stat-block__bar" aria-hidden="true" />
     </span>
   );
 }
@@ -105,7 +117,7 @@ export default function StatBlock({ section }) {
             return (
               <div className="stat-block__item" key={index}>
                 {number !== null ? (
-                  <CountUp value={number} suffix={suffix || stat.suffix || ""} animate={animate} />
+                  <CountUp value={number} suffix={suffix || stat.suffix || ""} animate={animate} index={index} />
                 ) : (
                   <span className="stat-block__value">{stat.value}</span>
                 )}

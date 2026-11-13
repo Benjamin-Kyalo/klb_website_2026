@@ -4564,6 +4564,49 @@ main video {
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.35em;
+}
+
+.stat-block__value .stat-block__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0;
+  background: var(--yellow, #f3e5ab);
+  transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stat-block__value.is-done .stat-block__bar {
+  width: 100%;
+}
+
+.stat-block__value.is-done {
+  animation: stat-settle 0.4s ease-out;
+}
+
+@keyframes stat-settle {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-0.08em);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-block__value.is-done {
+    animation: none;
+  }
+  .stat-block__value .stat-block__bar {
+    transition: none;
+    width: 100%;
+  }
 }
 
 .stat-block__label {
