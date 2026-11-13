@@ -101,6 +101,45 @@ export async function api(path, { method = "GET", body, headers = {}, raw = fals
   return data;
 }
 
+/**
+ * Download a file from an authenticated endpoint and save it in the browser.
+ * Used for backups and activity-log exports.
+ */
+export async function downloadFile(path, fallbackName = "download") {
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError("Cannot reach the server. Check your connection and try again.", 0);
+  }
+
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+      ? await response.json()
+      : await response.text();
+    throw extractError(data, response.status);
+  }
+
+  const disposition = response.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  const filename = match ? decodeURIComponent(match[1]) : fallbackName;
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  return filename;
+}
+
 // ---------------------------------------------------------------------------
 // Public endpoints
 // ---------------------------------------------------------------------------
@@ -178,6 +217,12 @@ export const admin = {
     }),
   permissionsMeta: () => api("/admin/users/permissions/"),
   activity: (params = {}) => api(`/admin/activity/${buildQuery(params)}`),
+  activityExport: (params = {}) => {
+    const format = (params.format || "csv").toLowerCase();
+    const fallback = `activity_log.${format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv"}`;
+    return downloadFile(`/admin/activity/export/${buildQuery(params)}`, fallback);
+  },
+  activityActors: () => api("/admin/activity/actors/"),
   options: {
     list: (params = {}) => api(`/admin/options/${buildQuery(params)}`),
     groups: (params = {}) => api(`/admin/options/groups/${buildQuery(params)}`),
@@ -203,6 +248,25 @@ export const admin = {
     remove: (id) => api(`/admin/digital-partners/${id}/`, { method: "DELETE" }),
   },
   backup: (type = "full") => api("/admin/backup/", { method: "POST", body: { type } }),
+  backups: {
+    list: (params = {}) => api(`/admin/backup/${buildQuery(params)}`),
+    create: (payload = {}) => {
+      const body =
+        typeof payload === "string" || Array.isArray(payload)
+          ? { type: payload }
+          : payload || {};
+      return api("/admin/backup/", { method: "POST", body });
+    },
+    download: (id, filename) =>
+      downloadFile(`/admin/backup/${id}/download/`, filename || `backup-${id}.zip`),
+    restore: (id) => api(`/admin/backup/${id}/restore/`, { method: "POST" }),
+    remove: (id) => api(`/admin/backup/${id}/`, { method: "DELETE" }),
+    upload: (file) => {
+      const form = new FormData();
+      form.append("file", file);
+      return api("/admin/backup/upload/", { method: "POST", body: form });
+    },
+  },
   aiDraft: (topic) => api("/admin/ai-draft/", { method: "POST", body: { topic } }),
   themes: {
     list: (params = {}) => api(`/admin/themes/${buildQuery(params)}`),

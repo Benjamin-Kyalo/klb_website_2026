@@ -11,7 +11,8 @@ const QUICK_LINKS = [
   { label: "News", href: "/admin/news", note: "Announcements shown on the home page and news index.", module: "news" },
   { label: "Enquiries", href: "/admin/enquiries", note: "Messages sent through the contact form.", module: "enquiries" },
   { label: "Resources", href: "/admin/resources", note: "Price lists, annual reports and forms.", module: "resources" },
-  { label: "Site settings", href: "/admin/settings", note: "Contact details, social links and navigation.", module: "settings" },
+  { label: "Admin settings", href: "/admin/settings", note: "Organisation details, publishing defaults and system preferences.", module: "settings" },
+  { label: "Backup & restore", href: "/admin/backup", note: "Create, download, upload and restore site archives.", module: "backup" },
 ];
 
 export default function AdminDashboard() {

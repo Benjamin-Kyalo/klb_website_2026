@@ -12,6 +12,7 @@ export const MODULES = [
   { key: "settings", label: "Site settings", group: "System", actions: ["view", "edit"] },
   { key: "users", label: "Users", group: "System", actions: ["view", "create", "edit", "delete"] },
   { key: "activity", label: "Activity log", group: "System", actions: ["view"] },
+  { key: "backup", label: "Backup & restore", group: "System", actions: ["view", "create", "delete"] },
   { key: "options", label: "Dropdown options", group: "System", actions: ACTIONS },
   { key: "media", label: "File uploads", group: "Content", actions: ["view", "create"] },
 ];
@@ -38,6 +39,7 @@ const ADMIN_DEFAULTS = {
   settings: ["view", "edit"],
   users: ["view", "create", "edit", "delete"],
   activity: ["view"],
+  backup: ["view", "create", "delete"],
   options: ACTIONS,
   media: ["view", "create"],
 };
@@ -111,6 +113,7 @@ export function firstAllowedPath(user) {
     ["settings", "/admin/settings"],
     ["users", "/admin/users"],
     ["activity", "/admin/activity"],
+    ["backup", "/admin/backup"],
     ["options", "/admin/options"],
   ];
   return order.find(([module]) => can(user, module, "view"))?.[1] || "/admin/account";

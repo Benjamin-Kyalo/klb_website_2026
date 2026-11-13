@@ -183,15 +183,22 @@ On a paid web service:
 
    | Field | Value |
    | --- | --- |
-   | Name | `klb-media` |
-   | Mount Path | `/opt/render/project/src/backend/media` |
-   | Size | `1 GB` (increase later if needed) |
+   | Name | `klb-data` |
+   | Mount Path | `/opt/render/project/src/data` |
+   | Size | `5 GB` (increase later if needed) |
 
 3. Save and redeploy.
 
-Why this path: Render checks out the repository at `/opt/render/project/src`, so `backend/media` is exactly `/opt/render/project/src/backend/media`, which is the value of `MEDIA_ROOT`. The `.gitkeep` file keeps the directory in Git so the mount point exists on the first deploy.
+4. Set these environment variables so Django points at the disk:
 
-On the Free plan there is no disk. Uploads still work during a session but disappear on the next deploy or restart. Use the Free plan for testing only.
+   | Key | Value |
+   | --- | --- |
+   | `MEDIA_DIR` | `/opt/render/project/src/data/media` |
+   | `BACKUP_DIR` | `/opt/render/project/src/data/backups` |
+
+Why this path: a single disk holds both uploaded media and private backup archives. `MEDIA_ROOT` becomes `/opt/render/project/src/data/media` and `BACKUP_ROOT` becomes `/opt/render/project/src/data/backups`. Keeping backups on the same disk as media means a backup survives redeploys, which the default ephemeral filesystem would not. The `.gitkeep` file keeps the directory in Git so the mount point exists on the first deploy.
+
+On the Free plan there is no disk. Uploads and backups still work during a session but disappear on the next deploy or restart. Use the Free plan for testing only.
 
 ## 6. First deploy
 
@@ -322,7 +329,9 @@ On the Free plan there is no disk. Uploads still work during a session but disap
 ## 12. Backups
 
 - Render Postgres (paid plans) supports manual and scheduled backups from the database page. Enable at least daily backups for production.
-- Media files on a persistent disk are **not** backed up by Render. Periodically copy `backend/media/` to object storage or download it through the Render Shell.
+- The dashboard's **Backup & restore** page writes archives to `BACKUP_ROOT` (the persistent disk when `BACKUP_DIR` is set). These archives are private and are never served as public media.
+- Because the archive contains a JSON dump of the database plus the media files, downloading one archive from the dashboard is enough to move the whole site to another host.
+- Media files on a persistent disk are **not** backed up by Render itself. The dashboard backup is the supported way to copy them off the server; you can also copy `backend/media/` to object storage.
 - Keep the Git repository as the source of truth for code and seed data. A database restore plus the repository is enough to rebuild the site.
 
 ## 13. Optional: one-click blueprint

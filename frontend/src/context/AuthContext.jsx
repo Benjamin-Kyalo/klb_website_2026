@@ -8,6 +8,11 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Idle timeout: sign out after 25 minutes without interaction. This mirrors
+  // the backend session lifetime (30 minutes) and is slightly shorter so the
+  // client logs out cleanly before the server session expires.
+  const IDLE_TIMEOUT_MS = 25 * 60 * 1000;
+
   const refresh = useCallback(async () => {
     try {
       const data = await auth.me();
@@ -38,6 +43,26 @@ export function AuthProvider({ children }) {
       setUser(null);
     }
   }, []);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    let timer = null;
+    const reset = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        logout();
+      }, IDLE_TIMEOUT_MS);
+    };
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((event) =>
+      window.addEventListener(event, reset, { passive: true })
+    );
+    reset();
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      events.forEach((event) => window.removeEventListener(event, reset));
+    };
+  }, [user, logout]);
 
   const value = useMemo(() => {
     const permissions = effectivePermissions(user);

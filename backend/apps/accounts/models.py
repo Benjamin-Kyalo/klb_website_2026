@@ -90,6 +90,8 @@ class ActivityLog(models.Model):
         SETTINGS = "settings", "Settings updated"
         USER = "user", "User account changed"
         PASSWORD = "password", "Password reset"
+        BACKUP = "backup", "Backup operation"
+        EXPORT = "export", "Report exported"
 
     actor = models.ForeignKey(
         User,

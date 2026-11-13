@@ -1,5 +1,6 @@
 from django.contrib.auth import login, logout
 from django.db.models import Q
+from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -226,15 +227,187 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["actor_name", "actor_email", "object_label", "detail"]
     ordering_fields = ["created_at", "action", "module"]
 
+    EXPORT_HEADERS = ["Date and time", "User", "Email", "Action", "Module", "Record", "Details", "IP address"]
+
+    @staticmethod
+    def _safe_cell(value):
+        text = "" if value is None else str(value)
+        # Prevent spreadsheet formulas from being executed when opened.
+        return f"'{text}" if text.startswith(("=", "+", "-", "@")) else text
+
+    @staticmethod
+    def _export_row(log):
+        return [
+            log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
+            ActivityLogViewSet._safe_cell(log.actor_name),
+            ActivityLogViewSet._safe_cell(log.actor_email),
+            ActivityLogViewSet._safe_cell(log.get_action_display()),
+            ActivityLogViewSet._safe_cell(log.module),
+            ActivityLogViewSet._safe_cell(log.object_label),
+            ActivityLogViewSet._safe_cell(log.detail),
+            ActivityLogViewSet._safe_cell(log.ip_address or ""),
+        ]
+
     def get_queryset(self):
+        from django.utils.dateparse import parse_date
+
         qs = super().get_queryset()
-        module = self.request.query_params.get("module")
+        params = self.request.query_params
+        module = params.get("module")
         if module:
             qs = qs.filter(module=module)
-        action_name = self.request.query_params.get("action")
+        action_name = params.get("action")
         if action_name:
             qs = qs.filter(action=action_name)
-        actor = self.request.query_params.get("actor")
+        actor = params.get("actor")
         if actor:
             qs = qs.filter(actor_id=actor)
+        date_from = parse_date(params.get("date_from") or "")
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        date_to = parse_date(params.get("date_to") or "")
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
         return qs
+
+    @action(detail=False, methods=["get"], url_path="actors")
+    def actors(self, request):
+        """Distinct users who appear in the (optionally filtered) log."""
+        rows = (
+            self.get_queryset()
+            .exclude(actor__isnull=True)
+            .values("actor_id", "actor_name", "actor_email")
+            .distinct()
+            .order_by("actor_name", "actor_email")
+        )
+        return Response(
+            [
+                {
+                    "id": row["actor_id"],
+                    "name": row["actor_name"] or row["actor_email"] or "Unknown user",
+                    "email": row["actor_email"],
+                }
+                for row in rows
+            ]
+        )
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        """Export the filtered activity log as CSV, Excel or PDF."""
+        import csv
+        import io
+        from django.utils import timezone
+
+        fmt = (request.query_params.get("format") or "csv").strip().lower()
+        qs = self.filter_queryset(self.get_queryset())
+        rows = [self._export_row(log) for log in qs]
+        stamp = timezone.now().strftime("%Y%m%d_%H%M")
+
+        if fmt == "xlsx":
+            try:
+                from openpyxl import Workbook
+                from openpyxl.styles import Font
+            except ImportError:
+                return Response(
+                    {"detail": "Excel export is not available on this server. Please use CSV."},
+                    status=status.HTTP_501_NOT_IMPLEMENTED,
+                )
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "Activity log"
+            sheet.append(self.EXPORT_HEADERS)
+            for cell in sheet[1]:
+                cell.font = Font(bold=True)
+            for row in rows:
+                sheet.append(row)
+            widths = [18, 22, 28, 20, 18, 32, 60, 18]
+            for index, width in enumerate(widths, start=1):
+                sheet.column_dimensions[sheet.cell(row=1, column=index).column_letter].width = width
+            sheet.freeze_panes = "A2"
+            buffer = io.BytesIO()
+            workbook.save(buffer)
+            response = HttpResponse(
+                buffer.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = f'attachment; filename="activity_log_{stamp}.xlsx"'
+        elif fmt == "pdf":
+            try:
+                from reportlab.lib import colors
+                from reportlab.lib.pagesizes import A4, landscape
+                from reportlab.lib.styles import getSampleStyleSheet
+                from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+                from xml.sax.saxutils import escape
+            except ImportError:
+                return Response(
+                    {"detail": "PDF export is not available on this server. Please use CSV."},
+                    status=status.HTTP_501_NOT_IMPLEMENTED,
+                )
+            buffer = io.BytesIO()
+            document = SimpleDocTemplate(
+                buffer,
+                pagesize=landscape(A4),
+                leftMargin=24,
+                rightMargin=24,
+                topMargin=28,
+                bottomMargin=28,
+            )
+            styles = getSampleStyleSheet()
+            small = styles["BodyText"].clone("small")
+            small.fontSize = 7
+            small.leading = 9
+            data = [self.EXPORT_HEADERS]
+            for row in rows:
+                data.append([Paragraph(escape(str(cell)), small) for cell in row])
+            table = Table(data, repeatRows=1, colWidths=[62, 78, 100, 66, 62, 110, 180, 64])
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#062f4e")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 7.5),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#c9d6e2")),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f3f7fa")]),
+                    ]
+                )
+            )
+            document.build(
+                [
+                    Paragraph("Kenya Literature Bureau PLC - activity log", styles["Title"]),
+                    Paragraph(
+                        f"Generated {timezone.now().strftime('%d %b %Y %H:%M')} - {len(rows)} entries. "
+                        "Filters currently applied on the activity log page are reflected in this report.",
+                        styles["BodyText"],
+                    ),
+                    Spacer(1, 10),
+                    table,
+                ]
+            )
+            response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="activity_log_{stamp}.pdf"'
+        elif fmt == "csv":
+            buffer = io.StringIO()
+            buffer.write("\ufeff")  # UTF-8 BOM so Excel reads accents correctly.
+            writer = csv.writer(buffer)
+            writer.writerow(self.EXPORT_HEADERS)
+            for row in rows:
+                writer.writerow(row)
+            response = HttpResponse(buffer.getvalue(), content_type="text/csv; charset=utf-8")
+            response["Content-Disposition"] = f'attachment; filename="activity_log_{stamp}.csv"'
+        else:
+            return Response(
+                {"detail": "Choose a supported export format: csv, xlsx or pdf."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        log_activity(
+            request,
+            ActivityLog.Action.EXPORT,
+            "activity",
+            None,
+            "Activity log",
+            f"Exported {len(rows)} entries as {fmt.upper()}.",
+        )
+        return response

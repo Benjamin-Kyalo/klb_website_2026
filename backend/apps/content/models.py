@@ -225,6 +225,54 @@ class DigitalPartner(models.Model):
         return self.name
 
 
+class BackupRecord(models.Model):
+    """Tracks backups created, uploaded or attempted through the dashboard."""
+
+    class BackupType(models.TextChoices):
+        FULL = "full", "Full (database + media)"
+        DATABASE = "database", "Database only"
+        MEDIA = "media", "Media only"
+        SELECTIVE = "selective", "Selected components"
+
+    class Status(models.TextChoices):
+        SUCCESS = "success", "Successful"
+        FAILED = "failed", "Failed"
+        IN_PROGRESS = "in_progress", "In progress"
+
+    filename = models.CharField(max_length=255)
+    backup_type = models.CharField(max_length=20, choices=BackupType.choices, default=BackupType.FULL)
+    size = models.PositiveBigIntegerField(default=0)
+    components = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUCCESS)
+    error = models.TextField(blank=True)
+    storage = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="backups",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    restored_at = models.DateTimeField(null=True, blank=True)
+    restored_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="restored_backups",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            # One history row per archive file. Failed attempts have no file and
+            # are allowed to share the empty filename.
+            models.UniqueConstraint(
+                fields=["filename"],
+                condition=~models.Q(filename=""),
+                name="uniq_backup_archive_filename",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.filename} ({self.get_backup_type_display()})"
+
+
 class WebsiteTheme(models.Model):
     """A scheduled website theme or campaign.
 
@@ -261,6 +309,21 @@ class WebsiteTheme(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+
+            base = slugify(self.name)[:70] or "theme"
+            slug = base
+            counter = 2
+            existing = WebsiteTheme.objects.exclude(pk=self.pk)
+            while existing.filter(slug=slug).exists():
+                suffix = f"-{counter}"
+                slug = f"{base[: 80 - len(suffix)]}{suffix}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class DropdownOption(models.Model):
@@ -326,6 +389,12 @@ class SiteSetting(models.Model):
     seo_default_title = models.CharField(max_length=200, blank=True)
     seo_default_description = models.TextField(blank=True)
     og_image = models.CharField(max_length=300, blank=True)
+    maintenance_mode = models.BooleanField(default=False)
+    maintenance_message = models.TextField(blank=True)
+    backup_retention = models.PositiveSmallIntegerField(
+        default=10,
+        help_text="Number of backups to keep. Set to 0 to keep every backup.",
+    )
     navigation = models.JSONField(default=list, blank=True)
     footer_columns = models.JSONField(default=list, blank=True)
     statistics = models.JSONField(default=list, blank=True)

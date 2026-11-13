@@ -30,6 +30,10 @@ from apps.accounts.views import (
 from apps.catalogue.views import BookViewSet, CatalogueFiltersView
 from apps.content.views import (
     AdminBackupView,
+    AdminBackupDownloadView,
+    AdminBackupDeleteView,
+    AdminBackupRestoreView,
+    AdminBackupUploadView,
     AdminAIDraftView,
     AdminBookViewSet,
     AdminCareerViewSet,
@@ -114,6 +118,10 @@ urlpatterns = [
     path("api/admin/themes/", AdminWebsiteThemeViewSet.as_view({"get": "list", "post": "create"}), name="admin-themes"),
     path("api/admin/themes/<int:pk>/", AdminWebsiteThemeViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}), name="admin-theme"),
     path("api/admin/backup/", AdminBackupView.as_view(), name="admin-backup"),
+    path("api/admin/backup/<int:pk>/download/", AdminBackupDownloadView.as_view(), name="admin-backup-download"),
+    path("api/admin/backup/<int:pk>/restore/", AdminBackupRestoreView.as_view(), name="admin-backup-restore"),
+    path("api/admin/backup/<int:pk>/", AdminBackupDeleteView.as_view(), name="admin-backup-delete"),
+    path("api/admin/backup/upload/", AdminBackupUploadView.as_view(), name="admin-backup-upload"),
     path("api/admin/digital-partners/", AdminDigitalPartnerViewSet.as_view({"get": "list", "post": "create"}), name="admin-digital-partners"),
     path("api/admin/digital-partners/<int:pk>/", AdminDigitalPartnerViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}), name="admin-digital-partner"),
     path("api/admin/team-photos/", AdminTeamPhotoView.as_view(), name="admin-team-photos"),

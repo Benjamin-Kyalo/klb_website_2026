@@ -110,7 +110,7 @@ export default function AdminApp() {
       <Route path="options" element={<Page module="options"><LazyPage><AdminOptions /></LazyPage></Page>} />
       <Route path="team-photos" element={<Page module="pages"><LazyPage><AdminTeamPhotos /></LazyPage></Page>} />
       <Route path="digital-partners" element={<Page module="pages"><LazyPage><AdminDigitalPartners /></LazyPage></Page>} />
-      <Route path="backup" element={<Page module="pages"><LazyPage><AdminBackup /></LazyPage></Page>} />
+      <Route path="backup" element={<Page module="backup"><LazyPage><AdminBackup /></LazyPage></Page>} />
       <Route path="themes" element={<Page module="pages"><LazyPage><AdminThemes /></LazyPage></Page>} />
       <Route
         path="account"

@@ -8,7 +8,7 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="site-footer">
+    <footer className="site-footer" id="siteFooter">
       <div className="container footer-top">
         <div className="footer-brand">
           <p>{settings.footer_blurb}</p>
@@ -68,6 +68,15 @@ export default function Footer() {
           </li>
           <li>
             <Link to="/resources/">Resources</Link>
+          </li>
+          <li>
+            <button
+              type="button"
+              className="footer-a11y-link"
+              onClick={() => window.dispatchEvent(new Event("klb:open-accessibility"))}
+            >
+              Accessibility options
+            </button>
           </li>
         </ul>
       </div>

@@ -1,7 +1,7 @@
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import Career, DigitalPartner, DropdownOption, News, Page, Resource, Section, SiteSetting, TeamPhoto, Tender, WebsiteTheme
+from .models import BackupRecord, Career, DigitalPartner, DropdownOption, News, Page, Resource, Section, SiteSetting, TeamPhoto, Tender, WebsiteTheme
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -195,8 +195,41 @@ class DigitalPartnerSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "updated_at"]
 
 
+class BackupRecordSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source="created_by.display_name", read_only=True, default="")
+    restored_by_name = serializers.CharField(source="restored_by.display_name", read_only=True, default="")
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = BackupRecord
+        fields = [
+            "id", "filename", "backup_type", "size", "components", "status",
+            "status_label", "error", "storage", "created_by", "created_by_name",
+            "created_at", "restored_at", "restored_by", "restored_by_name",
+        ]
+        read_only_fields = fields
+
+
 class WebsiteThemeSerializer(serializers.ModelSerializer):
     status = serializers.CharField(read_only=True)
+    # The form allows the slug to be left blank; the model generates one from
+    # the theme name in save(). Keep it optional here so validation passes.
+    slug = serializers.SlugField(required=False, allow_blank=True)
+
+    def validate_slug(self, value):
+        value = (value or "").strip()
+        if not value:
+            # The model generates a slug from the name when this is blank.
+            return value
+        queryset = WebsiteTheme.objects.filter(slug=value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "A theme with this slug already exists. Choose a different slug "
+                "or leave it blank."
+            )
+        return value
 
     class Meta:
         model = WebsiteTheme
@@ -212,6 +245,7 @@ class SiteSettingSerializer(serializers.ModelSerializer):
             "contact_email", "customer_email", "facebook", "twitter", "instagram",
             "linkedin", "ebookstore", "announcement", "footer_blurb",
             "seo_default_title", "seo_default_description", "og_image",
+            "maintenance_mode", "maintenance_message", "backup_retention",
             "navigation", "footer_columns", "statistics", "updated_at",
         ]
         read_only_fields = ["updated_at"]

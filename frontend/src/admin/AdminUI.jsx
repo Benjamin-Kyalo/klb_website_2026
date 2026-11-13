@@ -12,9 +12,9 @@ export function PageHead({ title, lead, actions }) {
   );
 }
 
-export function Card({ title, actions, children, className = "" }) {
+export function Card({ title, actions, children, className = "", style }) {
   return (
-    <section className={`admin-card ${className}`.trim()}>
+    <section className={`admin-card ${className}`.trim()} style={style}>
       {title || actions ? (
         <div className="admin-card__head">
           {title ? <h2>{title}</h2> : <span />}

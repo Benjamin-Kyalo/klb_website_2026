@@ -115,6 +115,11 @@ AUTH_PASSWORD_VALIDATORS = [
 SESSION_COOKIE_NAME = "klb_session"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+# Inactivity timeout. Each request resets the clock when
+# SESSION_SAVE_EVERY_REQUEST is True, so active users stay signed in.
+SESSION_COOKIE_AGE = int(os.getenv("SESSION_TIMEOUT_SECONDS", "1800"))
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = env_bool("SESSION_EXPIRE_AT_BROWSER_CLOSE", False)
 CSRF_COOKIE_HTTPONLY = False  # the React client reads this token
 CSRF_COOKIE_SAMESITE = "Lax"
 
@@ -135,6 +140,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "apps.catalogue.pagination.CataloguePagination",
     "PAGE_SIZE": 24,
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    # The activity-log export uses ?format=csv|xlsx|pdf. DRF treats a "format"
+    # query parameter as a renderer override by default, which would return a
+    # 404 before the export view runs. The export view handles the parameter.
+    "URL_FORMAT_OVERRIDE": None,
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -163,7 +172,17 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Media and backups share one persistent Render disk in production. Keeping the
+# two directories configurable also makes local development and other hosts
+# straightforward.
+MEDIA_ROOT = Path(os.getenv("MEDIA_DIR", str(BASE_DIR / "media"))).resolve()
+
+# Backups must not live inside MEDIA_ROOT because that directory is served
+# publicly. On Render, point BACKUP_DIR at a persistent disk mount.
+BACKUP_ROOT = Path(os.getenv("BACKUP_DIR", str(BASE_DIR / "backups"))).resolve()
+BACKUP_MAX_UPLOAD_BYTES = int(os.getenv("BACKUP_MAX_UPLOAD_BYTES", 1024 * 1024 * 1024))
+# Refuse to unpack an archive larger than this during a restore.
+BACKUP_MAX_RESTORE_BYTES = int(os.getenv("BACKUP_MAX_RESTORE_BYTES", 4 * 1024 * 1024 * 1024))
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

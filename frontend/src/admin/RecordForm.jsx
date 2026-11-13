@@ -16,6 +16,8 @@ function toFormValue(field, value) {
 function fromFormValue(field, value) {
   if (field.type === "checkbox") return Boolean(value);
   if (field.type === "number") return value === "" ? null : Number(value);
+  // An empty date input means "no date", not an invalid date string.
+  if (field.type === "date") return value === "" ? null : value;
   if (field.type === "tags")
     return String(value)
       .split(",")

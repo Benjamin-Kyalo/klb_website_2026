@@ -7,7 +7,7 @@ const TITLES = [
   ["/admin/team-photos", "Team photos"],
   ["/admin/digital-partners", "Digital partners"],
   ["/admin/themes", "Website themes"],
-  ["/admin/backup", "Backup"],
+  ["/admin/backup", "Backup & restore"],
   ["/admin/books", "Catalogue"],
   ["/admin/news", "News"],
   ["/admin/careers", "Careers"],
@@ -63,7 +63,7 @@ export default function AdminLayout({ children }) {
   const systemNav = [
     { to: "/admin/settings", label: "Site settings", module: "settings" },
     { to: "/admin/themes", label: "Website themes", module: "pages" },
-    { to: "/admin/backup", label: "Backup", module: "pages" },
+    { to: "/admin/backup", label: "Backup & restore", module: "backup" },
     { to: "/admin/users", label: "Users and permissions", module: "users" },
     { to: "/admin/activity", label: "Activity log", module: "activity" },
     { to: "/admin/options", label: "Dropdown options", module: "options", manage: true },

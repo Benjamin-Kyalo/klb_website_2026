@@ -23,6 +23,7 @@ MODULES = {
     "settings": {"label": "Site settings", "group": "System", "actions": ("view", "edit")},
     "users": {"label": "Users", "group": "System", "actions": ("view", "create", "edit", "delete")},
     "activity": {"label": "Activity log", "group": "System", "actions": ("view",)},
+    "backup": {"label": "Backup & restore", "group": "System", "actions": ("view", "create", "delete")},
     "options": {"label": "Dropdown options", "group": "System", "actions": ACTIONS},
     "media": {"label": "File uploads", "group": "Content", "actions": ("view", "create")},
 }
@@ -55,6 +56,7 @@ _ADMIN_DEFAULTS = {
     "settings": ["view", "edit"],
     "users": ["view", "create", "edit", "delete"],
     "activity": ["view"],
+    "backup": ["view", "create", "delete"],
     "options": list(ACTIONS),
     "media": ["view", "create"],
 }

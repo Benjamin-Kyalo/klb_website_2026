@@ -1,8 +1,16 @@
 import os
 import re
+import json
+import zipfile
+
 from django.conf import settings
 from django.core.management import call_command
+from django.db import IntegrityError
+from django.db.models import Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from pathlib import Path
+from django.utils import timezone
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -18,8 +26,9 @@ from apps.catalogue.serializers import BookSerializer
 from apps.enquiries.models import Enquiry, Subscriber
 from apps.enquiries.serializers import EnquirySerializer, SubscriberSerializer
 
-from .models import Career, DigitalPartner, DropdownOption, News, Page, Resource, SiteSetting, TeamPhoto, Tender, WebsiteTheme
+from .models import BackupRecord, Career, DigitalPartner, DropdownOption, News, Page, Resource, SiteSetting, TeamPhoto, Tender, WebsiteTheme
 from .serializers import (
+    BackupRecordSerializer,
     CareerSerializer,
     DigitalPartnerSerializer,
     DropdownOptionSerializer,
@@ -462,39 +471,601 @@ class AdminWebsiteThemeViewSet(AdminActivityMixin, viewsets.ModelViewSet):
         instance.delete()
 
 
-class AdminBackupView(APIView):
-    permission_classes = [IsStaff]
+BACKUP_COMPONENT_CHOICES = {
+    "database": "Database (content, users and settings)",
+    "media": "Media files (images and documents)",
+}
 
-    def get_permissions(self):
-        return [IsStaff()]
+
+def _normalise_components(raw):
+    """Return a clean, ordered list of selected backup components."""
+    if raw in (None, "", []):
+        return []
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, (list, tuple, set)):
+        return []
+    chosen = []
+    for item in raw:
+        text = str(item).strip().lower()
+        if text in BACKUP_COMPONENT_CHOICES and text not in chosen:
+            chosen.append(text)
+    return chosen
+
+
+def _backup_type_from_components(components):
+    chosen = set(components)
+    if chosen == {"database", "media"}:
+        return BackupRecord.BackupType.FULL
+    if chosen == {"database"}:
+        return BackupRecord.BackupType.DATABASE
+    if chosen == {"media"}:
+        return BackupRecord.BackupType.MEDIA
+    return BackupRecord.BackupType.SELECTIVE
+
+
+def _backup_metadata(file_obj):
+    try:
+        if hasattr(file_obj, "seek"):
+            file_obj.seek(0)
+        with zipfile.ZipFile(file_obj, "r") as zf:
+            for name in zf.namelist():
+                if name.endswith("metadata.json"):
+                    return json.loads(zf.read(name).decode("utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _infer_components(file_obj):
+    meta = _backup_metadata(file_obj)
+    kind = meta.get("backup_type")
+    if kind == "database":
+        return ["database"]
+    if kind == "media":
+        return ["media"]
+    names = []
+    try:
+        if hasattr(file_obj, "seek"):
+            file_obj.seek(0)
+        with zipfile.ZipFile(file_obj, "r") as zf:
+            names = zf.namelist()
+    except Exception:
+        pass
+    has_db = any(n.endswith("database.json") or n.endswith("db.sqlite3") for n in names)
+    has_media = any("/media/" in n and not n.endswith("/") for n in names)
+    if has_db and has_media:
+        return ["database", "media"]
+    if has_db:
+        return ["database"]
+    if has_media:
+        return ["media"]
+    return []
+
+
+def _safe_backup_name(filename):
+    return Path(filename).name
+
+
+class AdminBackupView(APIView):
+    permission_classes = [ModulePermission]
+    permission_module = "backup"
+
+    def _sync_disk_records(self):
+        """Register archives that exist on disk but are missing from the table.
+
+        Two dashboard requests can arrive at the same moment (for example the
+        React development double-render). `get_or_create` plus the unique
+        filename constraint keeps the history free of duplicate rows.
+        """
+        output_dir = settings.BACKUP_ROOT
+        if not output_dir.exists():
+            return
+        for f in output_dir.glob("*.zip"):
+            components = _infer_components(f)
+            try:
+                BackupRecord.objects.get_or_create(
+                    filename=f.name,
+                    defaults={
+                        "backup_type": _backup_type_from_components(components),
+                        "components": components,
+                        "size": f.stat().st_size,
+                        "status": BackupRecord.Status.SUCCESS,
+                        "storage": "server",
+                    },
+                )
+            except IntegrityError:
+                # Another request registered this archive first.
+                continue
+
+    def _apply_retention(self):
+        """Delete the oldest backups above the configured retention limit."""
+        try:
+            keep = int(SiteSetting.load().backup_retention or 0)
+        except Exception:
+            keep = 0
+        if keep <= 0:
+            return
+        records = list(
+            BackupRecord.objects.filter(status=BackupRecord.Status.SUCCESS)
+            .exclude(filename="")
+            .order_by("-created_at")
+        )
+        for record in records[keep:]:
+            file_path = settings.BACKUP_ROOT / _safe_backup_name(record.filename)
+            try:
+                if file_path.exists():
+                    file_path.unlink()
+            except OSError:
+                continue
+            record.delete()
+
+    def get(self, request):
+        self._sync_disk_records()
+        qs = BackupRecord.objects.all()
+        search = (request.query_params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(
+                Q(filename__icontains=search)
+                | Q(created_by__email__icontains=search)
+                | Q(created_by__full_name__icontains=search)
+            )
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        type_filter = request.query_params.get("type")
+        if type_filter:
+            qs = qs.filter(backup_type=type_filter)
+        return Response(BackupRecordSerializer(qs, many=True).data)
 
     def post(self, request):
-        backup_type = request.data.get("type", "full")
-        output_dir = settings.BASE_DIR / "backups"
+        has_components_key = "components" in request.data
+        components = _normalise_components(request.data.get("components"))
+        if not components and not has_components_key and request.data.get("type"):
+            # Backwards compatibility for older clients that posted a single
+            # "type" value instead of a component list.
+            legacy = str(request.data.get("type") or "full").lower()
+            components = (
+                ["database", "media"]
+                if legacy == "full"
+                else _normalise_components([legacy])
+            )
+        if not components:
+            return Response(
+                {
+                    "detail": (
+                        "Choose at least one component to back up: the database, "
+                        "media files, or both."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        backup_type = _backup_type_from_components(components)
+        output_dir = settings.BACKUP_ROOT
         output_dir.mkdir(parents=True, exist_ok=True)
+        before = {f.resolve() for f in output_dir.glob("*.zip")}
 
         from io import StringIO
-        out = StringIO()
-        try:
-            if backup_type == "database":
-                call_command("backup", "--database-only", "--output", str(output_dir), stdout=out)
-            elif backup_type == "media":
-                call_command("backup", "--media-only", "--output", str(output_dir), stdout=out)
-            else:
-                call_command("backup", "--output", str(output_dir), stdout=out)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        backups = sorted(output_dir.glob("*.zip"), key=lambda f: f.stat().st_mtime, reverse=True)
-        if backups:
-            latest = backups[0]
-            return Response({
+        args = ["backup"]
+        if components == ["database"]:
+            args.append("--database-only")
+        elif components == ["media"]:
+            args.append("--media-only")
+        args.extend(["--output", str(output_dir)])
+
+        try:
+            call_command(*args, stdout=StringIO())
+        except Exception as exc:
+            record = BackupRecord.objects.create(
+                filename="",
+                backup_type=backup_type,
+                components=components,
+                status=BackupRecord.Status.FAILED,
+                error=f"{type(exc).__name__}: {exc}"[:2000],
+                storage="server",
+                created_by=request.user,
+            )
+            log_activity(
+                request,
+                ActivityLog.Action.BACKUP,
+                "backup",
+                record,
+                "Backup attempt",
+                "Backup failed: " + str(exc)[:300],
+            )
+            return Response(
+                {
+                    "detail": (
+                        "The backup could not be completed. The failure has been "
+                        "recorded in the backup history and the server logs."
+                    ),
+                    "id": record.id,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        created = [f for f in output_dir.glob("*.zip") if f.resolve() not in before]
+        if not created:
+            created = list(output_dir.glob("*.zip"))
+        if not created:
+            record = BackupRecord.objects.create(
+                filename="",
+                backup_type=backup_type,
+                components=components,
+                status=BackupRecord.Status.FAILED,
+                error="The backup command finished but produced no archive.",
+                storage="server",
+                created_by=request.user,
+            )
+            log_activity(
+                request, ActivityLog.Action.BACKUP, "backup", record,
+                "Backup attempt", "No archive was produced.",
+            )
+            return Response(
+                {"detail": "The backup finished without producing a file. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        latest = max(created, key=lambda f: f.stat().st_mtime)
+        record = BackupRecord.objects.create(
+            filename=latest.name,
+            backup_type=backup_type,
+            components=components,
+            size=latest.stat().st_size,
+            status=BackupRecord.Status.SUCCESS,
+            storage="server",
+            created_by=request.user,
+        )
+        self._apply_retention()
+        log_activity(
+            request,
+            ActivityLog.Action.BACKUP,
+            "backup",
+            record,
+            latest.name,
+            f"Created {backup_type} backup ({', '.join(components)}).",
+        )
+        return Response(
+            {
                 "detail": "Backup created successfully.",
+                "id": record.id,
                 "filename": latest.name,
                 "size": latest.stat().st_size,
-                "path": str(latest),
-            })
-        return Response({"detail": "Backup completed but no file was created."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            }
+        )
+
+
+class AdminBackupDownloadView(APIView):
+    permission_classes = [ModulePermission]
+    permission_module = "backup"
+
+    def get(self, request, pk):
+        record = get_object_or_404(BackupRecord, pk=pk)
+        if not record.filename:
+            return Response(
+                {"detail": "This backup record has no archive attached."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        file_path = settings.BACKUP_ROOT / _safe_backup_name(record.filename)
+        if not file_path.exists():
+            return Response(
+                {"detail": "Backup file not found on disk."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        log_activity(
+            request,
+            ActivityLog.Action.BACKUP,
+            "backup",
+            record,
+            record.filename,
+            "Downloaded backup archive.",
+        )
+        def file_chunks(path, chunk_size=65536):
+            with open(path, "rb") as source:
+                while True:
+                    chunk = source.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+
+        from django.http import StreamingHttpResponse
+
+        response = StreamingHttpResponse(
+            file_chunks(file_path), content_type="application/zip"
+        )
+        response["Content-Disposition"] = f'attachment; filename="{file_path.name}"'
+        return response
+
+
+class AdminBackupDeleteView(APIView):
+    permission_classes = [ModulePermission]
+    permission_module = "backup"
+    permission_action = "delete"
+
+    def delete(self, request, pk):
+        record = get_object_or_404(BackupRecord, pk=pk)
+        filename = record.filename
+        file_path = (
+            settings.BACKUP_ROOT / _safe_backup_name(filename) if filename else None
+        )
+        try:
+            if file_path and file_path.is_file():
+                file_path.unlink()
+        except OSError as exc:
+            return Response(
+                {"detail": f"The backup file could not be deleted: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        record.delete()
+        log_activity(
+            request,
+            ActivityLog.Action.DELETE,
+            "backup",
+            None,
+            filename or "Backup record",
+            "Deleted backup archive and its history record.",
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminBackupRestoreView(APIView):
+    permission_classes = [ModulePermission]
+    permission_module = "backup"
+    # Restoring overwrites live data, so it is treated as a destructive action
+    # rather than a normal create.
+    permission_action = "delete"
+
+    def post(self, request, pk):
+        record = get_object_or_404(BackupRecord, pk=pk)
+        if not record.filename:
+            return Response(
+                {"detail": "This backup record has no archive attached."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        file_path = settings.BACKUP_ROOT / _safe_backup_name(record.filename)
+        if not file_path.exists():
+            return Response(
+                {"detail": "Backup file not found on disk."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Validate before touching any existing data.
+        if not zipfile.is_zipfile(file_path):
+            return Response(
+                {"detail": "This file is not a valid backup archive."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        max_uncompressed = getattr(
+            settings, "BACKUP_MAX_RESTORE_BYTES", 4 * 1024 * 1024 * 1024
+        )
+        with zipfile.ZipFile(file_path, "r") as zf:
+            infos = zf.infolist()
+            if len(infos) > 200000:
+                return Response(
+                    {"detail": "This archive contains too many files to restore safely."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if sum(info.file_size for info in infos) > max_uncompressed:
+                return Response(
+                    {"detail": "This archive is larger than the restore limit."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            names = zf.namelist()
+            db_files = [n for n in names if n.endswith("database.json")]
+            media_files = [
+                n
+                for n in names
+                if "/media/" in n and not n.endswith("/") and ".." not in n.split("/")
+            ]
+            if not db_files and not media_files:
+                return Response(
+                    {"detail": "This archive does not contain a database or media files."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if db_files:
+                try:
+                    json.loads(zf.read(db_files[0]).decode("utf-8"))
+                except Exception:
+                    return Response(
+                        {"detail": "The database inside this archive is not valid JSON."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        # Create a safety backup before changing live data.
+        output_dir = settings.BACKUP_ROOT
+        output_dir.mkdir(parents=True, exist_ok=True)
+        before = {f.resolve() for f in output_dir.glob("*.zip")}
+        from io import StringIO
+
+        try:
+            call_command("backup", "--output", str(output_dir), stdout=StringIO())
+            created = [f for f in output_dir.glob("*.zip") if f.resolve() not in before]
+            if not created:
+                raise RuntimeError("the backup command did not produce an archive")
+            safety_file = max(created, key=lambda f: f.stat().st_mtime)
+            BackupRecord.objects.create(
+                filename=safety_file.name,
+                backup_type=BackupRecord.BackupType.FULL,
+                components=["database", "media"],
+                size=safety_file.stat().st_size,
+                status=BackupRecord.Status.SUCCESS,
+                storage="server",
+                created_by=request.user,
+            )
+        except Exception as exc:
+            log_activity(
+                request,
+                ActivityLog.Action.BACKUP,
+                "backup",
+                record,
+                record.filename,
+                f"Restore cancelled because the safety backup failed: {str(exc)[:300]}",
+            )
+            return Response(
+                {
+                    "detail": (
+                        "Restore cancelled: a safety backup could not be created. "
+                        "No data was changed."
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        restored = []
+        db_file = settings.BACKUP_ROOT / "_restore_db.json"
+        try:
+            with zipfile.ZipFile(file_path, "r") as zf:
+                if db_files:
+                    db_file.write_bytes(zf.read(db_files[0]))
+                    from django.core.management import call_command as run_command
+
+                    run_command("loaddata", str(db_file), verbosity=0)
+                    restored.append("database")
+                media_root = Path(settings.MEDIA_ROOT).resolve()
+                media_root.mkdir(parents=True, exist_ok=True)
+                restored_media = 0
+                for media_name in media_files:
+                    parts = media_name.split("/media/", 1)
+                    if len(parts) != 2 or not parts[1]:
+                        continue
+                    target = (media_root / parts[1]).resolve()
+                    if target != media_root and media_root not in target.parents:
+                        continue
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(zf.read(media_name))
+                    restored_media += 1
+                if restored_media:
+                    restored.append(f"media ({restored_media} files)")
+        except Exception as exc:
+            log_activity(
+                request,
+                ActivityLog.Action.BACKUP,
+                "backup",
+                record,
+                record.filename,
+                f"Restore failed: {str(exc)[:300]}",
+            )
+            return Response(
+                {
+                    "detail": (
+                        "The backup was validated but could not be restored. "
+                        "Your safety backup is available in the backup list. "
+                        f"Reason: {str(exc)[:300]}"
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        finally:
+            if db_file.exists():
+                db_file.unlink()
+
+        record.restored_at = timezone.now()
+        record.restored_by = request.user
+        record.save(update_fields=["restored_at", "restored_by"])
+        log_activity(
+            request,
+            ActivityLog.Action.BACKUP,
+            "backup",
+            record,
+            record.filename,
+            f"Restored {', '.join(restored) if restored else 'nothing'}. A safety backup was created first.",
+        )
+
+        return Response(
+            {
+                "detail": f"Restored: {', '.join(restored) if restored else 'nothing'}",
+                "restored": restored,
+            }
+        )
+
+
+class AdminBackupUploadView(APIView):
+    permission_classes = [ModulePermission]
+    permission_module = "backup"
+
+    def post(self, request):
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response(
+                {"detail": "Choose a backup file to upload."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        safe_name = _safe_backup_name(uploaded.name)
+        if not safe_name.lower().endswith(".zip"):
+            return Response(
+                {"detail": "Only .zip backup archives are accepted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if getattr(uploaded, "size", 0) > settings.BACKUP_MAX_UPLOAD_BYTES:
+            limit_mb = settings.BACKUP_MAX_UPLOAD_BYTES // (1024 * 1024)
+            return Response(
+                {"detail": f"This file is too large. The upload limit is {limit_mb} MB."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            uploaded.seek(0)
+            valid_zip = zipfile.is_zipfile(uploaded)
+        except Exception:
+            valid_zip = False
+        if not valid_zip:
+            return Response(
+                {"detail": "This file is not a valid .zip archive."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        components = _infer_components(uploaded)
+        if not components:
+            return Response(
+                {
+                    "detail": (
+                        "This archive does not contain a KLB database dump or media "
+                        "folder. It was not uploaded."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        output_dir = settings.BACKUP_ROOT
+        output_dir.mkdir(parents=True, exist_ok=True)
+        dest = output_dir / safe_name
+        counter = 2
+        while dest.exists():
+            dest = output_dir / f"{Path(safe_name).stem}-{counter}.zip"
+            counter += 1
+
+        uploaded.seek(0)
+        with open(dest, "wb") as f:
+            for chunk in uploaded.chunks():
+                f.write(chunk)
+
+        record = BackupRecord.objects.create(
+            filename=dest.name,
+            backup_type=_backup_type_from_components(components),
+            components=components,
+            size=dest.stat().st_size,
+            status=BackupRecord.Status.SUCCESS,
+            storage="server",
+            created_by=request.user,
+        )
+        log_activity(
+            request,
+            ActivityLog.Action.BACKUP,
+            "backup",
+            record,
+            dest.name,
+            f"Uploaded backup archive ({', '.join(components)}).",
+        )
+        return Response(
+            {
+                "detail": "Backup uploaded successfully.",
+                "id": record.id,
+                "filename": dest.name,
+                "size": dest.stat().st_size,
+                "components": components,
+            }
+        )
 
 
 class AdminAIDraftView(APIView):
