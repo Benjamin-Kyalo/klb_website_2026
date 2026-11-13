@@ -61,6 +61,11 @@ function CountUp({ value, suffix, animate, index }) {
               }
             };
             requestAnimationFrame(tick);
+            // Safety net for backgrounded tabs.
+            window.setTimeout(() => {
+              setDisplay(value);
+              setDone(true);
+            }, duration + 600);
             observer.disconnect();
           }
         });

@@ -179,6 +179,7 @@ class Command(BaseCommand):
             Resource.objects.all().delete()
             SiteSetting.objects.all().delete()
 
+        self._refresh = options["refresh"]
         settings_obj = self.seed_settings()
         pages = self.seed_pages(options["refresh"])
         books = self.seed_books()
@@ -220,14 +221,14 @@ class Command(BaseCommand):
             ),
             "seo_default_title": "Kenya Literature Bureau PLC | Books, publishing and printing since 1947",
             "seo_default_description": (
-                "Kenya Literature Bureau PLC publishes and prints CBC, secondary, revision and readers titles. "
+                "Kenya Literature Bureau PLC publishes and prints CBE, secondary, revision and readers titles. "
                 "Search KLB books, buy e-books, and enquire about bulk orders or printing services."
             ),
             "og_image": "/assets/og-klb.jpg",
             "navigation": NAVIGATION,
             "footer_columns": FOOTER_COLUMNS,
             "statistics": [
-                {"value": "1947", "label": "Established as the East African Literature Bureau", "animate": False},
+                {"value": "1947", "label": "Established as the East African Literature Bureau", "animate": True},
                 {"value": "1000", "suffix": "+", "label": "Titles published across every level", "animate": True},
                 {"value": "250", "suffix": "+", "label": "E-books available worldwide", "animate": True},
                 {"value": "300", "suffix": "+", "label": "Employees countrywide", "animate": True},
@@ -236,6 +237,10 @@ class Command(BaseCommand):
         obj, created = SiteSetting.objects.get_or_create(pk=1, defaults=defaults)
         if created:
             self.stdout.write("Created site settings.")
+        elif getattr(self, "_refresh", False):
+            obj.statistics = defaults["statistics"]
+            obj.save(update_fields=["statistics"])
+            self.stdout.write("Refreshed site settings statistics.")
         return obj
 
     def seed_pages(self, refresh=False):

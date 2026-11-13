@@ -7,6 +7,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { OptionsProvider } from "./context/OptionsContext.jsx";
 import { SiteProvider } from "./context/SiteContext.jsx";
 import { applyA11yPrefs, loadA11yPrefs } from "./lib/accessibility.js";
+import { startCountAnimations } from "./lib/animateCounts.js";
 import "./styles/klb.css";
 import "./styles/react.css";
 import "./styles/admin.css";
@@ -17,7 +18,8 @@ import "./styles/accessibility.css";
 // does not flash at the default size or colour scheme.
 applyA11yPrefs(loadA11yPrefs());
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
@@ -32,3 +34,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// Animate any CMS-injected numbers (e.g. the hero proof) when they enter view.
+startCountAnimations();

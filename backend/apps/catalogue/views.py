@@ -26,7 +26,10 @@ class BookViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(Q(category__iexact=category) | Q(categories__contains=[category]))
         collection = params.get("collection")
         if collection:
-            qs = qs.filter(collection__iexact=collection)
+            # Allow a short tab label such as "CBE" or "Secondary" to match
+            # every grade/form collection that starts with it (for example
+            # "CBE Grade 1", "Secondary Form 2").
+            qs = qs.filter(collection__istartswith=collection)
         level = params.get("level")
         if level:
             qs = qs.filter(level__iexact=level)

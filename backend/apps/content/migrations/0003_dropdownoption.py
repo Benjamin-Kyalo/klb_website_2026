@@ -10,9 +10,9 @@ DEFAULTS = {
         "Sales", "Schools",
     ],
     "publication_category": [
-        "CBC", "Secondary", "Revision", "Readers", "Tertiary", "Reference",
+        "CBE", "Secondary", "Revision", "Readers", "Tertiary", "Reference",
     ],
-    "collection": ["CBC", "Secondary", "Revision", "Readers", "Tertiary"],
+    "collection": ["CBE", "Secondary", "Revision", "Readers", "Tertiary"],
     "department": [
         "Editorial", "Publishing", "Sales and Marketing", "Finance",
         "Human Resources", "ICT", "Operations", "Legal", "Procurement",
