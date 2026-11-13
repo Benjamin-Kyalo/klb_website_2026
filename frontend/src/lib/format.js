@@ -40,7 +40,7 @@ export function safeImagePath(path) {
 }
 
 export const COLLECTION_LABELS = {
-  CBC: "CBC",
+  CBE: "CBE",
   Secondary: "Secondary",
   Revision: "Revision & TopMark",
   Readers: "Readers & literature",

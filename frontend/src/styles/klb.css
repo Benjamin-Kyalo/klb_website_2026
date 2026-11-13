@@ -27,8 +27,8 @@
   --success: #357a3b;
   --danger: #b32632;
 
-  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Century Gothic", "CenturyGothic", "AppleGothic", sans-serif;
+  --font-body: "Century Gothic", "CenturyGothic", "AppleGothic", sans-serif;
 
   --step--1: clamp(0.78rem, 0.74rem + 0.18vw, 0.88rem);
   --step-0: clamp(0.98rem, 0.94rem + 0.18vw, 1.06rem);

@@ -112,7 +112,7 @@ Important fields:
 
 - **Title** and **slug** - the slug is the book's address. Leave it blank to
   generate one from the title.
-- **Collection** - CBC, Secondary, Revision, Readers or Tertiary. This drives the
+- **Collection** - CBE, Secondary, Revision, Readers or Tertiary. This drives the
   public filters.
 - **Level, subject, language** - free text used by search and filters.
 - **Price** - numeric price in Kenyan shillings. Leave blank if there is no price.

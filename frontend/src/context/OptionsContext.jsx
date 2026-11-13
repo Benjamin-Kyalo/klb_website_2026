@@ -8,10 +8,10 @@ const FALLBACK = {
     "Operations", "Partnerships", "People", "Publishing", "Recognition",
     "Sales", "Schools",
   ].map((value) => ({ value, label: value })),
-  publication_category: ["CBC", "Secondary", "Revision", "Readers", "Tertiary", "Reference"].map(
+  publication_category: ["CBE", "Secondary", "Revision", "Readers", "Tertiary", "Reference"].map(
     (value) => ({ value, label: value })
   ),
-  collection: ["CBC", "Secondary", "Revision", "Readers", "Tertiary"].map((value) => ({
+  collection: ["CBE", "Secondary", "Revision", "Readers", "Tertiary"].map((value) => ({
     value,
     label: value,
   })),

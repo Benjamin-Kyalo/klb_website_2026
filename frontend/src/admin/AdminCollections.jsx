@@ -88,7 +88,7 @@ export function AdminBooks() {
       lookupField="slug"
       searchPlaceholder="Search title, ISBN, category…"
       defaults={{
-        collection: "CBC",
+        collection: "CBE",
         currency: "KES",
         publisher: "Kenya Literature Bureau PLC",
         is_published: true,

@@ -145,7 +145,7 @@ export default function AdminCrudPage({
                   type="text"
                   value={aiTopic}
                   onChange={(e) => setAiTopic(e.target.value)}
-                  placeholder="Enter a topic, e.g. KLB launches new CBC revision books"
+                  placeholder="Enter a topic, e.g. KLB launches new CBE revision books"
                   style={{ flex: 1, minWidth: "200px", padding: "0.5rem", border: "1px solid var(--line, #dfe4e5)", borderRadius: "6px" }}
                 />
                 <button

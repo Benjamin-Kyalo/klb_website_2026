@@ -12,14 +12,14 @@ export const FALLBACK_SETTINGS = {
   contact_email: "info@klb.co.ke",
   customer_email: "customer@klb.co.ke",
   facebook: "https://www.facebook.com/klbkenya/",
-  twitter: "https://twitter.com/klb_kenya",
+  twitter: "https://x.com/klbkenya?s=11",
   ebookstore: "https://klbbooks.com/",
   announcement: "",
   footer_blurb:
     "Kenya Literature Bureau PLC is a State corporation established in 1947 to publish, print and distribute educational, cultural and scientific materials for Kenya and the region.",
   seo_default_title: "Kenya Literature Bureau PLC | Books, publishing and printing since 1947",
   seo_default_description:
-    "Kenya Literature Bureau PLC publishes and prints CBC, secondary, revision and readers titles. Search KLB books, buy e-books, and enquire about bulk orders or printing services.",
+    "Kenya Literature Bureau PLC publishes and prints CBE, secondary, revision and readers titles. Search KLB books, buy e-books, and enquire about bulk orders or printing services.",
   og_image: "/assets/og-klb.jpg",
 };
 

@@ -16,7 +16,7 @@ export default function Footer() {
             <a href={settings.facebook || "https://www.facebook.com/klbkenya/"} rel="noopener" aria-label="KLB on Facebook">
               <FacebookIcon />
             </a>
-            <a href={settings.twitter || "https://twitter.com/klb_kenya"} rel="noopener" aria-label="KLB on X">
+            <a href={settings.twitter || "https://x.com/klbkenya?s=11"} rel="noopener" aria-label="KLB on X">
               <XIcon />
             </a>
             <a

@@ -6,7 +6,7 @@ import { Arrow } from "../Icons.jsx";
 
 const TABS = [
   { key: "featured", label: "Featured" },
-  { key: "CBC", label: "CBC" },
+  { key: "CBE", label: "CBE" },
   { key: "Secondary", label: "Secondary" },
   { key: "Readers", label: "Readers" },
 ];
