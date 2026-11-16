@@ -80,28 +80,28 @@ export default function AdminDashboard() {
         <>
           <div className="admin-stats">
             {can("books", "view") ? (
-              <div className="admin-stat">
+              <Link className="admin-stat" to="/admin/books">
                 <strong>{stats.published_books ?? stats.books}</strong>
                 <span>Published books</span>
-              </div>
+              </Link>
             ) : null}
             {can("pages", "view") ? (
-              <div className="admin-stat">
+              <Link className="admin-stat" to="/admin/pages">
                 <strong>{stats.published_pages ?? stats.pages}</strong>
                 <span>Published pages</span>
-              </div>
+              </Link>
             ) : null}
             {can("news", "view") ? (
-              <div className="admin-stat">
+              <Link className="admin-stat" to="/admin/news">
                 <strong>{stats.news}</strong>
                 <span>News items</span>
-              </div>
+              </Link>
             ) : null}
             {canEnquiries ? (
-              <div className={`admin-stat${stats.new_enquiries > 0 ? " admin-stat--alert" : ""}`}>
+              <Link className={`admin-stat${stats.new_enquiries > 0 ? " admin-stat--alert" : ""}`} to="/admin/enquiries">
                 <strong>{stats.new_enquiries}</strong>
                 <span>New enquiries</span>
-              </div>
+              </Link>
             ) : null}
           </div>
 
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
                       </thead>
                       <tbody>
                         {recent.map((item) => (
-                          <tr key={item.id}>
+                          <tr key={item.id} className="admin-table__row--clickable" onClick={() => (window.location.href = "/admin/enquiries")} style={{ cursor: "pointer" }}>
                             <td className="admin-table__title">
                               {item.name}
                               <br />
@@ -176,19 +176,19 @@ export default function AdminDashboard() {
                     {can("books", "view") ? (
                       <div>
                         <dt>Books</dt>
-                        <dd>{stats.books}</dd>
+                        <dd><Link to="/admin/books">{stats.books}</Link></dd>
                       </div>
                     ) : null}
                     {can("books", "view") ? (
                       <div>
                         <dt>Published</dt>
-                        <dd>{stats.published_books}</dd>
+                        <dd><Link to="/admin/books">{stats.published_books}</Link></dd>
                       </div>
                     ) : null}
                     {can("pages", "view") ? (
                       <div>
                         <dt>Pages</dt>
-                        <dd>{stats.pages}</dd>
+                        <dd><Link to="/admin/pages">{stats.pages}</Link></dd>
                       </div>
                     ) : null}
                   </dl>
@@ -200,19 +200,19 @@ export default function AdminDashboard() {
                     {can("careers", "view") ? (
                       <div>
                         <dt>Careers</dt>
-                        <dd>{stats.careers}</dd>
+                        <dd><Link to="/admin/careers">{stats.careers}</Link></dd>
                       </div>
                     ) : null}
                     {can("tenders", "view") ? (
                       <div>
                         <dt>Tenders</dt>
-                        <dd>{stats.tenders}</dd>
+                        <dd><Link to="/admin/tenders">{stats.tenders}</Link></dd>
                       </div>
                     ) : null}
                     {can("resources", "view") ? (
                       <div>
                         <dt>Resources</dt>
-                        <dd>{stats.resources}</dd>
+                        <dd><Link to="/admin/resources">{stats.resources}</Link></dd>
                       </div>
                     ) : null}
                   </dl>
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
                   <dl className="admin-facts">
                     <div>
                       <dt>Subscribers</dt>
-                      <dd>{stats.subscribers}</dd>
+                      <dd><Link to="/admin/subscribers">{stats.subscribers}</Link></dd>
                     </div>
                   </dl>
                   <Link className="btn btn--secondary btn--sm" to="/admin/subscribers">

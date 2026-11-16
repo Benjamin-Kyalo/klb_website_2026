@@ -58,7 +58,7 @@ from apps.content.views import (
     SiteView,
     TendersView,
 )
-from apps.enquiries.views import NewsletterView, PublicEnquiryView, UnsubscribeView
+from apps.enquiries.views import NewsletterView, PublicEnquiryView, TestInquiryEmailView, UnsubscribeView
 from apps.content.uploads import MediaUploadView
 
 from .views import health, robots_txt, serve_spa, sitemap_xml
@@ -106,6 +106,7 @@ urlpatterns = [
 
     # Public forms
     path("api/enquiries/", PublicEnquiryView.as_view(), name="enquiries"),
+    path("api/admin/settings/test-inquiry-email/", TestInquiryEmailView.as_view(), name="admin-test-inquiry-email"),
     path("api/newsletter/", NewsletterView.as_view(), name="newsletter"),
     path("api/newsletter/unsubscribe/", UnsubscribeView.as_view(), name="newsletter-unsubscribe"),
 

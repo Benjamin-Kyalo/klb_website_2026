@@ -184,6 +184,7 @@ export const admin = {
   settings: {
     get: () => api("/admin/settings/"),
     update: (payload) => api("/admin/settings/", { method: "PATCH", body: payload }),
+    testInquiryEmail: () => api("/admin/settings/test-inquiry-email/", { method: "POST", body: {} }),
   },
   list: (resource, params = {}) => api(adminUrl(resource, "") + buildQuery(params)),
   all: async (resource, params = {}) => {

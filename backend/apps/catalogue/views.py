@@ -23,7 +23,19 @@ class BookViewSet(viewsets.ReadOnlyModelViewSet):
 
         category = params.get("category")
         if category:
-            qs = qs.filter(Q(category__iexact=category) | Q(categories__contains=[category]))
+            # ``categories`` is a JSON list. The native contains lookup is
+            # PostgreSQL-only, so SQLite (tests, local previews) falls back to
+            # a text match instead of raising NotSupportedError.
+            from django.db import connection
+
+            if connection.vendor == "postgresql":
+                qs = qs.filter(
+                    Q(category__iexact=category) | Q(categories__contains=[category])
+                )
+            else:
+                qs = qs.filter(
+                    Q(category__iexact=category) | Q(categories__icontains=category)
+                )
         collection = params.get("collection")
         if collection:
             # Allow a short tab label such as "CBE" or "Secondary" to match
@@ -43,15 +55,20 @@ class BookViewSet(viewsets.ReadOnlyModelViewSet):
 
         search = (params.get("q") or "").strip()
         if search:
-            # Use PostgreSQL full-text search when available, fall back to icontains
-            try:
+            # PostgreSQL gets true full-text ranking. SQLite (tests, local
+            # previews) falls back to case-insensitive term matching. The
+            # choice is made from the connection vendor because the PostgreSQL
+            # expression only fails when the queryset is evaluated.
+            from django.db import connection
+
+            if connection.vendor == "postgresql":
                 search_query = SearchQuery(search, search_type="websearch")
-                qs = qs.annotate(rank=SearchRank("search_vector", search_query)).filter(search_vector=search_query)
-                # Order by relevance when searching
+                qs = qs.annotate(
+                    rank=SearchRank("search_vector", search_query)
+                ).filter(search_vector=search_query)
                 if not params.get("ordering"):
                     qs = qs.order_by("-rank", "-featured", "sort_order", "title")
-            except Exception:
-                # Fallback for non-PostgreSQL databases (e.g., SQLite in tests)
+            else:
                 terms = [term for term in search.split() if term]
                 for term in terms:
                     qs = qs.filter(

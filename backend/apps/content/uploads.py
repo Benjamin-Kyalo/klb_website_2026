@@ -14,6 +14,29 @@ from apps.accounts.permissions import CanUploadFiles
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
 MAX_SIZE = 8 * 1024 * 1024
 
+# Leading bytes for each permitted format. Checking the content as well as the
+# extension stops an executable or HTML payload renamed to .png from being
+# stored and served from the site.
+SIGNATURES = {
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".gif": (b"GIF87a", b"GIF89a"),
+    ".webp": (b"RIFF",),
+    ".pdf": (b"%PDF-",),
+}
+
+
+def _matches_signature(extension, upload):
+    upload.seek(0)
+    header = upload.read(16)
+    upload.seek(0)
+    expected = SIGNATURES.get(extension, ())
+    if extension == ".webp":
+        # RIFF....WEBP
+        return header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+    return any(header.startswith(prefix) for prefix in expected)
+
 
 class MediaUploadView(APIView):
     """Small upload endpoint used by the dashboard for covers and PDFs."""
@@ -32,6 +55,11 @@ class MediaUploadView(APIView):
         if extension not in ALLOWED_EXTENSIONS:
             return Response(
                 {"detail": "Allowed file types: JPG, PNG, WebP, GIF and PDF."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not _matches_signature(extension, upload):
+            return Response(
+                {"detail": "The file contents do not match the chosen file type."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

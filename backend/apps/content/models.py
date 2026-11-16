@@ -379,6 +379,7 @@ class SiteSetting(models.Model):
     address = models.CharField(max_length=255, blank=True)
     contact_email = models.EmailField(blank=True)
     customer_email = models.EmailField(blank=True)
+    inquiry_recipient_email = models.EmailField(blank=True)
     facebook = models.URLField(blank=True)
     twitter = models.URLField(blank=True)
     instagram = models.URLField(blank=True)

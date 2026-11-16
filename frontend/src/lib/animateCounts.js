@@ -1,15 +1,22 @@
+function formatNumber(n, useComma) {
+  return useComma ? n.toLocaleString() : String(n);
+}
+
 function animateOne(el) {
   if (el.dataset.countAnimated === "1") return;
   el.dataset.countAnimated = "1";
   const target = parseInt(el.getAttribute("data-count"), 10);
   if (Number.isNaN(target)) return;
   const suffix = el.getAttribute("data-suffix") || "";
+  const finalText = el.getAttribute("data-final");
+  const useComma = finalText ? finalText.includes(",") : target >= 1000;
+  const final = finalText || (formatNumber(target, useComma) + suffix);
   const reduced =
     typeof window !== "undefined" &&
     window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduced) {
-    el.textContent = target.toLocaleString() + suffix;
+    el.textContent = final;
     return;
   }
   const duration = 1400;
@@ -17,13 +24,13 @@ function animateOne(el) {
   const tick = (now) => {
     const progress = Math.min((now - start) / duration, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.round(eased * target).toLocaleString() + suffix;
+    el.textContent = formatNumber(Math.round(eased * target), useComma) + suffix;
     if (progress < 1) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
   // Safety net for backgrounded tabs / throttled rAF.
   setTimeout(() => {
-    el.textContent = target.toLocaleString() + suffix;
+    el.textContent = final;
   }, duration + 600);
 }
 

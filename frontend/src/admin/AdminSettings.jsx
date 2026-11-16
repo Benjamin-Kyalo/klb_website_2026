@@ -13,6 +13,7 @@ const ORGANISATION_FIELDS = [
   { name: "phone_alt", label: "Other phone numbers", hint: "Free text; shown under the main number." },
   { name: "contact_email", label: "General email", type: "email" },
   { name: "customer_email", label: "Customer care email", type: "email" },
+  { name: "inquiry_recipient_email", label: "Inquiry recipient email", type: "email", hint: "Website inquiries are delivered to this address. Leave blank to use the general email." },
   {
     name: "address",
     label: "Postal address",
@@ -141,6 +142,7 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [testingEmail, setTestingEmail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +169,20 @@ export default function AdminSettings() {
       setNotice(`${label} saved. The public website now uses these values.`);
       await reloadSite();
     };
+  }
+
+  async function testInquiryEmail() {
+    setTestingEmail(true);
+    setError("");
+    setNotice("");
+    try {
+      const data = await admin.settings.testInquiryEmail();
+      setNotice(data.detail || "Test email sent.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTestingEmail(false);
+    }
   }
 
   return (
@@ -218,6 +234,19 @@ export default function AdminSettings() {
                   onSubmit={saveGroup("Organisation and contact details")}
                   submitLabel="Save organisation details"
                 />
+                <div style={{ marginTop: "0.75rem" }}>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    onClick={testInquiryEmail}
+                    disabled={testingEmail}
+                  >
+                    {testingEmail ? "Sending…" : "Send test inquiry email"}
+                  </button>
+                  <p className="muted-meta" style={{ marginTop: "0.4rem" }}>
+                    Sends a test message to the configured inquiry recipient to confirm delivery.
+                  </p>
+                </div>
               </SettingsSection>
             </Card>
 

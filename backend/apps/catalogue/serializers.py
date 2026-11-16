@@ -21,6 +21,19 @@ class BookSerializer(serializers.ModelSerializer):
             "slug": {"required": False, "allow_blank": True},
         }
 
+    def validate_slug(self, value):
+        value = (value or "").strip()
+        if not value:
+            return value
+        qs = Book.objects.filter(slug=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Another catalogue title already uses this URL slug."
+            )
+        return value
+
     def get_price_display(self, obj):
         if obj.price is None:
             return ""

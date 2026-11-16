@@ -1,7 +1,36 @@
+import re
+
 from django.utils.text import slugify
 from rest_framework import serializers
 
 from .models import BackupRecord, Career, DigitalPartner, DropdownOption, News, Page, Resource, Section, SiteSetting, TeamPhoto, Tender, WebsiteTheme
+
+
+LINK_ERROR = "Enter a full https:// link or a site path beginning with /."
+
+
+def validate_document_link(value):
+    """Reject document links that would resolve to the wrong page.
+
+    A bare value such as ``assets\\docs\\file.pdf`` is treated by the browser
+    as a path relative to the current page, so it silently loads the site's
+    HTML shell instead of the file. Require either an absolute site path or a
+    full http(s) URL, and reject Windows-style backslashes.
+    """
+    value = (value or "").strip()
+    if not value:
+        return value
+    if "\\" in value:
+        raise serializers.ValidationError(
+            "Use forward slashes (/) in links, not backslashes."
+        )
+    if value.startswith("//"):
+        raise serializers.ValidationError(LINK_ERROR)
+    if value.startswith("/"):
+        return value
+    if re.match(r"^https?://", value, re.IGNORECASE):
+        return value
+    raise serializers.ValidationError(LINK_ERROR)
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -174,11 +203,17 @@ class TenderSerializer(serializers.ModelSerializer):
             "published_on", "opening_date", "closing_date", "status", "is_open", "sort_order",
         ]
 
+    def validate_document_url(self, value):
+        return validate_document_link(value)
+
 
 class ResourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Resource
         fields = ["id", "title", "category", "description", "file_url", "external", "sort_order"]
+
+    def validate_file_url(self, value):
+        return validate_document_link(value)
 
 
 class TeamPhotoSerializer(serializers.ModelSerializer):
@@ -242,7 +277,7 @@ class SiteSettingSerializer(serializers.ModelSerializer):
         model = SiteSetting
         fields = [
             "site_name", "tagline", "phone", "phone_alt", "address",
-            "contact_email", "customer_email", "facebook", "twitter", "instagram",
+            "contact_email", "customer_email", "inquiry_recipient_email", "facebook", "twitter", "instagram",
             "linkedin", "ebookstore", "announcement", "footer_blurb",
             "seo_default_title", "seo_default_description", "og_image",
             "maintenance_mode", "maintenance_message", "backup_retention",
@@ -261,6 +296,27 @@ class SiteSettingSerializer(serializers.ModelSerializer):
         return value
 
 
+class PublicSiteSettingSerializer(serializers.ModelSerializer):
+    """Settings that are safe to expose to anonymous visitors.
+
+    Operational values such as the private inquiry inbox and the backup
+    retention limit must never be readable through the public site endpoint;
+    they are only available to staff through /api/admin/settings/.
+    """
+
+    class Meta:
+        model = SiteSetting
+        fields = [
+            "site_name", "tagline", "phone", "phone_alt", "address",
+            "contact_email", "customer_email", "facebook", "twitter", "instagram",
+            "linkedin", "ebookstore", "announcement", "footer_blurb",
+            "seo_default_title", "seo_default_description", "og_image",
+            "maintenance_mode", "maintenance_message",
+            "navigation", "footer_columns", "statistics", "updated_at",
+        ]
+        read_only_fields = fields
+
+
 class DropdownOptionSerializer(serializers.ModelSerializer):
     group_label = serializers.CharField(source="get_group_display", read_only=True)
 
@@ -271,6 +327,11 @@ class DropdownOptionSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "value": {"required": False, "allow_blank": True},
         }
+        # Uniqueness is checked in validate() below, where a blank value has
+        # already been generated from the label. DRF's automatic
+        # UniqueTogetherValidator runs earlier and would reject the blank value
+        # as "required" before that can happen.
+        validators = []
 
     def validate_value(self, value):
         return (value or "").strip()

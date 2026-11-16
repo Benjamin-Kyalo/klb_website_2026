@@ -41,7 +41,7 @@ NAVIGATION = [
                 {
                     "title": "Curriculum",
                     "links": [
-                        ["CBC books", "/books/?collection=CBC", "Grade 1–4 learner books"],
+                        ["CBE books", "/books/?collection=CBE", "Grade 1–4 learner books"],
                         ["Secondary books", "/books/?collection=Secondary", "Form 1–4 course books"],
                         ["Revision & TopMark", "/books/?collection=Revision", "KCPE and KCSE revision"],
                     ],
@@ -108,7 +108,7 @@ FOOTER_COLUMNS = [
         "title": "Books",
         "links": [
             ["Full catalogue", "/books/"],
-            ["CBC books", "/books/?collection=CBC"],
+            ["CBE books", "/books/?collection=CBE"],
             ["Secondary books", "/books/?collection=Secondary"],
             ["Revision & TopMark", "/books/?collection=Revision"],
             ["Readers & literature", "/books/?collection=Readers"],
@@ -239,8 +239,11 @@ class Command(BaseCommand):
             self.stdout.write("Created site settings.")
         elif getattr(self, "_refresh", False):
             obj.statistics = defaults["statistics"]
-            obj.save(update_fields=["statistics"])
-            self.stdout.write("Refreshed site settings statistics.")
+            obj.navigation = defaults["navigation"]
+            obj.footer_columns = defaults["footer_columns"]
+            obj.seo_default_description = defaults["seo_default_description"]
+            obj.save(update_fields=["statistics", "navigation", "footer_columns", "seo_default_description"])
+            self.stdout.write("Refreshed site settings.")
         return obj
 
     def seed_pages(self, refresh=False):

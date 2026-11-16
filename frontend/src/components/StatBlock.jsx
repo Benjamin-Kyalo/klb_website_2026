@@ -83,7 +83,7 @@ function CountUp({ value, suffix, animate, index }) {
       className={`stat-block__value${done ? " is-done" : ""}`}
       style={{ transitionDelay: `${(index || 0) * 80}ms` }}
     >
-      {display.toLocaleString()}
+      {display}
       {suffix}
       <span className="stat-block__bar" aria-hidden="true" />
     </span>

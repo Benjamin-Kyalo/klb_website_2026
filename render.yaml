@@ -41,6 +41,23 @@ services:
         sync: false
       - key: DJANGO_LOG_LEVEL
         value: INFO
+      - key: SESSION_TIMEOUT_SECONDS
+        value: "1800"
+      # Email delivery for contact-form inquiries. Set EMAIL_HOST and the
+      # credentials in the Render dashboard; the app uses the console backend
+      # while EMAIL_HOST is blank so the site still works before SMTP is set.
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
 databases:
   - name: klb-postgres
     plan: basic-256mb

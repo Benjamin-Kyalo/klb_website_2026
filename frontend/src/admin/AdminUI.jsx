@@ -82,7 +82,27 @@ export function BackLink({ to, children = "Back" }) {
 }
 
 export function StatusBadge({ status }) {
-  const label = status === "published" ? "published" : status === "draft" ? "draft" : status === "new" ? "closing soon" : status === "expired" ? "expired" : status;
-  const cls = status === "published" ? "published" : status === "draft" ? "draft" : status === "new" ? "warn" : status === "expired" ? "muted" : "muted";
+  const label =
+    status === "published"
+      ? "published"
+      : status === "draft"
+        ? "draft"
+        : status === "new"
+          ? "closing soon"
+          : status === "expired"
+            ? "expired"
+            : status === "subscribed"
+              ? "subscribed"
+              : status === "unsubscribed"
+                ? "unsubscribed"
+                : status;
+  const cls =
+    status === "published" || status === "subscribed"
+      ? "published"
+      : status === "draft"
+        ? "draft"
+        : status === "new"
+          ? "warn"
+          : "muted";
   return <span className={`badge badge--${cls}`}>{label}</span>;
 }

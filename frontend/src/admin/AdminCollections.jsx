@@ -327,7 +327,7 @@ export function AdminResources() {
 const subscriberColumns = [
   { key: "email", label: "Email address", className: "admin-table__title" },
   { key: "created_at", label: "Subscribed", render: (row) => formatDate(row.created_at) },
-  { key: "is_active", label: "Status", render: (row) => <StatusBadge status={row.is_active ? "published" : "draft"} /> },
+  { key: "is_active", label: "Status", render: (row) => <StatusBadge status={row.is_active ? "subscribed" : "unsubscribed"} /> },
 ];
 
 export function AdminSubscribers() {

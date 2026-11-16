@@ -50,13 +50,29 @@ class Book(models.Model):
             GinIndex(fields=["search_vector"]),
         ]
 
+    def _unique_slug(self, title):
+        base = slugify(title)[:180] or "title"
+        candidate = base
+        counter = 2
+        existing = Book.objects.exclude(pk=self.pk)
+        while existing.filter(slug=candidate).exists():
+            suffix = f"-{counter}"
+            candidate = f"{base[: 180 - len(suffix)]}{suffix}"
+            counter += 1
+        return candidate
+
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)[:180]
+            self.slug = self._unique_slug(self.title)
         super().save(*args, **kwargs)
-        # Update search vector for full-text search
-        if self.search_vector is None:
+        # Keep the full-text index in step with edits. SearchVector is a
+        # PostgreSQL-only expression, so skip it on SQLite (tests, local
+        # previews) instead of raising NotSupportedError.
+        from django.db import connection
+
+        if connection.vendor == "postgresql":
             from django.contrib.postgres.search import SearchVector
+
             Book.objects.filter(pk=self.pk).update(
                 search_vector=SearchVector("title", weight="A")
                 + SearchVector("subject", weight="B")

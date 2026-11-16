@@ -28,6 +28,7 @@ ALLOWED_ATTRIBUTES = {
         "aria-atomic", "aria-invalid", "aria-required", "aria-selected",
         "aria-pressed", "aria-haspopup", "data-enquiry-form", "data-form-status",
         "data-member", "data-caption", "data-lightbox", "data-team-photo",
+        "data-count", "data-suffix", "data-final", "data-animate",
     ],
     "a": ["href", "name", "rel", "target", "download"],
     "img": ["src", "alt", "width", "height", "loading", "srcset", "sizes"],

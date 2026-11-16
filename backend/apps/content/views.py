@@ -35,6 +35,7 @@ from .serializers import (
     NewsSerializer,
     PageDetailSerializer,
     PageListSerializer,
+    PublicSiteSettingSerializer,
     ResourceSerializer,
     SiteSettingSerializer,
     TeamPhotoSerializer,
@@ -55,7 +56,7 @@ class SiteView(APIView):
         pages = Page.objects.filter(status=Page.Status.PUBLISHED).values("slug", "title", "template")
         return Response(
             {
-                "settings": SiteSettingSerializer(settings_obj).data,
+                "settings": PublicSiteSettingSerializer(settings_obj).data,
                 "navigation": settings_obj.navigation or [],
                 "pages": list(pages),
             }
