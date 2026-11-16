@@ -363,7 +363,7 @@ class Command(BaseCommand):
         data = load_json("cms-seed.json")
         count = 0
         for index, item in enumerate(data["tenders"]):
-            _, created = Tender.objects.get_or_create(
+            tender, created = Tender.objects.get_or_create(
                 title=item["title"],
                 defaults={
                     "category": item.get("category", ""),
@@ -377,13 +377,16 @@ class Command(BaseCommand):
             )
             if created:
                 count += 1
+            elif "\\" in (tender.document_url or ""):
+                tender.document_url = item.get("documentUrl", tender.document_url)
+                tender.save(update_fields=["document_url"])
         return count
 
     def seed_resources(self):
         data = load_json("cms-seed.json")
         count = 0
         for item in data["resources"]:
-            _, created = Resource.objects.get_or_create(
+            resource, created = Resource.objects.get_or_create(
                 title=item["title"],
                 defaults={
                     "category": item["category"],
@@ -395,6 +398,11 @@ class Command(BaseCommand):
             )
             if created:
                 count += 1
+            elif "\\" in (resource.file_url or ""):
+                # Repair values saved by older seeds that used Windows-style
+                # backslashes; these resolve to the wrong page on the site.
+                resource.file_url = item.get("fileUrl", resource.file_url)
+                resource.save(update_fields=["file_url"])
         return count
 
     def seed_digital_partners(self):
