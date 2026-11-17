@@ -1,12 +1,19 @@
 """Seed the KLB website with verified content.
 
 Usage:
-    python manage.py seed_content             # create anything that is missing
-    python manage.py seed_content --reset     # replace pages, catalogue and settings
+    python manage.py seed_content                 # create anything that is missing
+    python manage.py seed_content --refresh       # apply a new seed release once
+    python manage.py seed_content --force-refresh # overwrite dashboard edits with seed copy
+    python manage.py seed_content --reset         # replace pages, catalogue and settings
 
 The command is safe to run more than once. It never deletes administrator
 accounts. All text comes from backend/seed/*.json.
+
+`--refresh` is deliberately gated by a fingerprint of the seed files: a deploy
+applies the seed copy once per seed release and afterwards keeps content edited
+in the dashboard. Use `--force-refresh` to deliberately restore the seed copy.
 """
+import hashlib
 import json
 import os
 from decimal import Decimal
@@ -145,6 +152,23 @@ def load_json(name):
         return json.load(handle)
 
 
+SEED_FILES = ("cms-seed.json", "books.json")
+
+
+def seed_fingerprint():
+    """Return a short fingerprint of every seed file.
+
+    The value changes only when the seed content itself changes, so a deploy
+    can refresh stale rows once without overwriting later dashboard edits.
+    """
+    digest = hashlib.sha256()
+    for name in SEED_FILES:
+        path = SEED_DIR / name
+        digest.update(name.encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:32]
+
+
 def normalise_cover(value):
     if not value:
         return ""
@@ -162,7 +186,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--refresh",
             action="store_true",
-            help="Update existing pages, sections and news copy from the seed files.",
+            help="Apply the seed copy when the seed release is newer than the database.",
+        )
+        parser.add_argument(
+            "--force-refresh",
+            action="store_true",
+            help="Overwrite pages, sections, news and settings with the seed copy, even if already applied.",
         )
         parser.add_argument("--admin-email", default=os.getenv("SEED_ADMIN_EMAIL", "admin@klb.co.ke"))
         parser.add_argument("--admin-password", default=os.getenv("SEED_ADMIN_PASSWORD", "ChangeMe-2026!"))
@@ -179,16 +208,30 @@ class Command(BaseCommand):
             Resource.objects.all().delete()
             SiteSetting.objects.all().delete()
 
-        self._refresh = options["refresh"]
+        revision = seed_fingerprint()
+        applied = SiteSetting.objects.filter(pk=1).values_list("seed_revision", flat=True).first() or ""
+        force = options["force_refresh"]
+        refresh = bool(options["reset"] or force or (options["refresh"] and applied != revision))
+        self._refresh = refresh
+
+        if refresh:
+            self.stdout.write(f"Applying seed revision {revision}.")
+        elif options["refresh"]:
+            self.stdout.write("Seed revision already applied; keeping dashboard edits.")
+
         settings_obj = self.seed_settings()
-        pages = self.seed_pages(options["refresh"])
+        pages = self.seed_pages(refresh)
         books = self.seed_books()
-        news = self.seed_news(options["refresh"])
+        news = self.seed_news(refresh)
         careers = self.seed_careers()
         tenders = self.seed_tenders()
         resources = self.seed_resources()
         digital_partners = self.seed_digital_partners()
         self.seed_admin(options["admin_email"], options["admin_password"])
+
+        if refresh and settings_obj.seed_revision != revision:
+            settings_obj.seed_revision = revision
+            settings_obj.save(update_fields=["seed_revision"])
 
         self.stdout.write(self.style.SUCCESS("Seed complete:"))
         self.stdout.write(

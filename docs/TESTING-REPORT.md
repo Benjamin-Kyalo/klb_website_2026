@@ -1,208 +1,534 @@
-# KLB PLC Website – Functional Testing Report
+# KLB PLC Website - Functional Testing Report
 
-**Project:** Kenya Literature Bureau PLC website (public site + admin dashboard)  
-**Date:** 16 November 2026  
-**Working directory:** `C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026`  
-**Stack:** React 18 + Vite 6 / Django 5 + DRF / PostgreSQL 18 (local `klb_verify` for verification)  
-**Branding:** `#F3E5AB` yellow, Century Gothic, KLB branding preserved.
+**Project:** Kenya Literature Bureau PLC website (public site + admin dashboard)
+**Report date:** 17 November 2026
+**Working directory:** `C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026`
+**Stack:** React 18 + Vite 6 / Django 5 + DRF / PostgreSQL (local `klb_verify`, production Supabase)
+**Branding:** `#F3E5AB` yellow, Century Gothic, KLB identity preserved.
 
-## 1. Test environment
+---
+
+## 1. Verdict
+
+The site and dashboard are functional and deployable. Every item marked **PASS** or **FIXED**
+below was executed against a running application (Django + Vite + PostgreSQL, plus the
+live Render deployment) - not inferred from reading code.
+
+| Area | Result |
+|---|---|
+| Backend automated suite | **128 tests, OK** (0 failures, 0 errors) |
+| Django system check | 0 issues |
+| Migration drift | "No changes detected" |
+| Frontend lint (esbuild parse) | 55 files, no syntax errors |
+| Frontend unit tests | **11 / 11 pass** |
+| Frontend production build | Success (~3.4 s), `dist/` generated |
+| Public browser journeys | All routes, catalogue, forms, newsletter, 404, PDFs verified |
+| Admin browser journeys | Every module's create / edit / delete exercised in the UI |
+| Production (Render) | Hero content and counters now current; theme endpoint live |
+| Remaining blockers | Real SMTP credentials, push/deploy of this commit (see section 11) |
+
+Two defects were found *because* this round executed the app rather than reading it:
+
+1. Production was serving stale content because the Render **Build Command** was not
+   running `seed_content` at all (local and Render disagreed). The command is now part of
+   the build, gated so it cannot overwrite later dashboard edits.
+2. Seasonal themes had a working API but the public frontend never consumed it. Themes are
+   now applied to `<body>` and removed when the campaign window closes.
+
+---
+
+## 2. Test environment
 
 | Item | Value |
 |---|---|
-| Backend Python | `backend/.venv` (Python 3.13) |
-| Django settings (tests) | `config.test_settings` (SQLite in-memory) |
-| Django settings (local dev) | `config.dev_settings` (refuses Supabase) |
+| Backend interpreter | `backend\.venv\Scripts\python.exe` (Python 3.13) |
+| Django settings (tests) | `config.test_settings` (SQLite in memory, temp media/backups) |
+| Django settings (local dev) | `config.dev_settings` (refuses to run against Supabase) |
 | Local database | `postgres://postgres:1234@127.0.0.1:5432/klb_verify` |
-| Backend server | `http://127.0.0.1:8000` (Django dev server) |
-| Frontend server | `http://127.0.0.1:5173` (Vite dev server, proxies `/api`, `/media`) |
-| Admin credentials (local) | `admin@klb.com` / `Klb@2026` (super administrator) |
-| Browser tab used | `tab_2b7f7fd1-6245-4e02-a725-0eaa8164b7c3` |
+| Local backend | `http://127.0.0.1:8000` |
+| Local frontend | `http://127.0.0.1:5173` (Vite proxy for `/api`, `/media`, `/assets` is served from `public/`) |
+| Local admin | `admin@klb.com` / `Klb@2026` (super administrator) |
+| Local DB state | 1 user, 128 books, 12 pages, 21 news items, 19 resources, 9 tenders, 1 career, 0 enquiries, 0 subscribers |
+| Local migration | `content.0016_sitesetting_seed_revision` applied |
+| Seed revision applied | `c8e02fdec79007028bf7dd4523e0fc32` |
+| Production URL | `https://klb-website.onrender.com` |
 
-## 2. Automated test results
+Audit artefacts were removed afterwards: no audit book, career, tender, resource, theme,
+partner, page or enquiry rows remain in the local database.
 
-| Check | Command | Result |
+---
+
+## 3. Automated test evidence (executed)
+
+| Check | Command | Observed result |
 |---|---|---|
-| Django system check | `manage.py check --settings=config.test_settings` | 0 issues |
-| Migration check | `manage.py makemigrations --check --dry-run` | No changes detected |
-| Full backend suite | `manage.py test --settings=config.test_settings` | **123 tests, OK** |
-| Audit suite | `manage.py test apps.content.test_audit --settings=config.test_settings` | **53 tests, OK** |
-| Frontend lint | `npm run lint` | 55 files parsed, no syntax errors |
-| Frontend unit tests | `npm test` | **11/11 pass** |
-| Frontend production build | `npm run build` | Success in ~3.4s, `dist/` generated |
+| Django system check | `manage.py check --settings=config.test_settings` | `System check identified no issues (0 silenced).` |
+| Migration drift | `manage.py makemigrations --check --dry-run --settings=config.test_settings` | `No changes detected` |
+| Full backend suite | `manage.py test --settings=config.test_settings` | `Ran 128 tests in 11.163s` -> `OK` |
+| Accounts app | `manage.py test apps.accounts --settings=config.test_settings` | `Ran 32 tests ... OK` |
+| Content app | `manage.py test apps.content --settings=config.test_settings` | `Ran 96 tests ... OK` |
+| Endpoint/permission audit | `manage.py test apps.content.test_audit --settings=config.test_settings` | `Ran 54 tests ... OK` |
+| Seed release gate | `manage.py test apps.content.test_seed_content --settings=config.test_settings` | `Ran 4 tests ... OK` |
+| Frontend lint | `npm run lint` | `Parsed 55 source files with esbuild. No syntax errors.` |
+| Frontend unit tests | `npm test` | `tests 11 / pass 11 / fail 0` |
+| Frontend build | `npm run build` | `built in 3.44s` |
 
-## 3. Functional testing table
+The 128 backend tests cover: public content and status filtering, catalogue search /
+filters / pagination / sorting, book detail, careers and tender expiry windows, resources,
+digital partners, active theme window, sitemap / robots / health / SPA shell, media
+traversal, public forms (validation, honeypot, rate limits, email recipients),
+authentication (CSRF, login, `me`, logout, suspended and inactive accounts, password
+change), every dashboard CRUD surface, editor permission clamping, activity log filtering
+and CSV/XLSX/PDF export, backup lifecycle and restore, upload signature validation, dropdown
+options, site settings, test-inquiry email, AI draft (success and upstream failure), and
+security boundaries.
+
+---
+
+## 4. Public site journeys (executed in the browser)
+
+| Journey | Observed |
+|---|---|
+| `/` | Renders with title, hero, newsletter; no console errors |
+| Hero animation, local | Sampled every 50 ms: `180+ / 45+ / 350` -> `270+ / 68+ / 527` -> ... -> `1,000+ / 250+ / 1947` |
+| Catalogue `/books/` | 128 titles; 24 cards per page; "Show more" loads page 2 |
+| Search `Mathematics` | 9 results |
+| Collection `CBE` | 19 results (`CBE Grade 1..4` matched by prefix) |
+| Price sort (descending) | Highest prices first |
+| Book detail | Title, price, ISBN, collection, description, buy link, related titles |
+| Contact form with `?book=` | Message prefilled with the book title; submit -> `201`; enquiry persisted; email written to console backend |
+| Newsletter subscribe | `201`; subscriber active; UI confirms |
+| Newsletter unsubscribe | `200`; subscriber inactive; UI confirms |
+| Routes `/about/ /services/ /digital/ /news/ /careers/ /tenders/ /resources/ /privacy/ /terms/` | Correct H1/title, no error state |
+| News detail | Title, category, date, body |
+| `/does-not-exist/` | 404 page |
+| `/books/no-such-book-xyz/` | "We could not find that book." |
+| Expired career (created in the UI) | Badge `EXPIRED`; public card has no href, `pointer-events:none`, "This vacancy has closed." |
+| Expired tender (created in the UI) | Badge `EXPIRED`; public card closed; backslash document path rejected `400`; corrected path created `201`; editing closing date to 2027 flipped badge to `OPEN` and restored the public download link |
+| Resource document | `/assets/docs/klb-price-list-2026.pdf` -> `200`, `application/pdf`, 32,835,061 bytes, header `%PDF-1.7` |
+| Digital partner | Created in dashboard -> visible on `/api/digital-partners/` -> deleted -> gone from the public API |
+| Seasonal theme | Created -> `/api/themes/active/` returns it -> `<body class="theme-audit">`; end date moved into the past -> status `DRAFT`, endpoint returns `{active:false}`, body class removed |
+| Sitemap / robots / health | `200`, valid XML / text / `{"status":"ok"}` |
+
+---
+
+## 5. Admin dashboard journeys (executed in the browser)
+
+| Module | Observed |
+|---|---|
+| Login / logout | `POST /api/auth/login/` 200; `/api/auth/me/` role `super_admin`, 14 permission modules |
+| Dashboard | Counts match the database (128 books, 12 pages, 21 news) |
+| Pages | Meta description `PATCH` 200 reflected on `/api/pages/privacy/`; status `draft` -> public 404; republished + meta reverted -> 200 |
+| Books | Create 201 -> public 200 -> search count 1 -> edit price `PATCH` 200 (550 -> 750) -> delete 204 -> public 404 |
+| News | Create 201 -> public list 22 items -> delete 204 |
+| Careers | Create expired vacancy 201 -> badge `EXPIRED` -> public closed -> delete 204 |
+| Tenders | Create 201 -> unknown/expired handling -> edit 2027 `PATCH` 200 -> `OPEN` -> delete 204 |
+| Resources | Create 201 -> public API contains it -> delete 204 |
+| Digital partners | Create 201 -> public API contains it -> delete 204 -> removed publicly |
+| Themes | Create 201 -> active endpoint + body class -> expiry 200 -> inactive -> delete 204 |
+| Dropdown options | Create 201 (blank value generated), edit 200, delete 204 |
+| Settings | Tagline/meta saved and reverted; public `/api/site/` reflects edits immediately |
+| Test inquiry email | `POST /api/admin/settings/test-inquiry-email/` 200 with honest console-backend message |
+| Enquiries | List, filter, status `PATCH` 200, internal note `PATCH` 200, delete 204 |
+| Subscribers | List, search, delete 204; badge shows `UNSUBSCRIBED` |
+| Users & permissions | Create user 201, delete 204; editor sees only permitted navigation; restricted endpoints return 403 |
+| Activity log | Filter `module=users&action=user` returns 2 entries; CSV/XLSX/PDF exports 200 with correct MIME |
+| Backups | Create `klb_backup_*.zip` 490.4 KB SUCCESSFUL; download 502,193 bytes `application/zip`; delete 204 (row + file gone) |
+| Uploads | Team photo upload 201 and served; renamed text file with `.png` extension rejected 400 by signature check |
+
+---
+
+## 6. Functional testing table
 
 | Feature | Expected Result | Actual Result | Status | Fix Applied |
 |---|---|---|---|---|
-| Home page render | Title, hero, footer, newsletter load | Renders correctly, no console errors | PASS | None |
-| Hero counters | `data-count`/`data-suffix`/`data-final` animate | Attributes allowed by sanitizer; counters animate | FIXED | Sanitizer allow-list updated |
-| Catalogue list (128 titles) | 24 cards per page, pagination | 24 cards, "Show more" loads page 2 (48 total) | PASS | None |
-| Catalogue search "Mathematics" | Filtered results | 9 results returned | PASS | None |
-| Catalogue collection filter "CBE" | Matches `CBE Grade 1..4` | 19 results via `collection__istartswith` | FIXED | `istartswith` filter + vendor-aware filtering |
-| Catalogue price sort (desc) | Highest prices first | Correct order observed | PASS | None |
-| Book detail page | Title, price, metadata, buy link, related titles | All fields render; print/bulk CTAs present | PASS | None |
-| Contact form prefill (`?book=`) | Message prefilled with book title | Prefill verified; submit 201 | PASS | None |
-| Contact form submission | Persist enquiry + email | `Enquiry` id 1 persisted; console email logged (201) | PASS | None |
-| Newsletter subscribe | 201 + active subscriber | `Subscriber` active=True, UI "You are on the list" | PASS | None |
-| Newsletter unsubscribe | 200 + inactive subscriber | `Subscriber.is_active=False`, UI "unsubscribed" | PASS | None |
-| Route sweep (`/about/`, `/services/`, `/digital/`, `/news/`, `/careers/`, `/tenders/`, `/resources/`, `/privacy/`, `/terms/`) | Correct title/H1, no error state | All load with correct H1, no console errors | PASS | None |
-| News detail page | Full article view | Loads with title, category, date, body | PASS | None |
-| 404 page (`/does-not-exist/`) | "Page not found" | Renders 404 page, title correct | PASS | None |
-| Missing book (`/books/no-such-book-xyz/`) | "We could not find that book." | Error state shown | PASS | None |
-| Resource PDFs (18) | 200 `application/pdf` | All 18 return 200 PDF | PASS | None |
-| Tender PDFs (13) | 200 `application/pdf` | All 13 return 200 PDF | PASS | None |
-| Broken price-list download | 200 PDF | Was 404 HTML shell (backslash URL + wrong case) | FIXED | Renamed file to lowercase; `validate_document_link` rejects backslashes |
-| Admin login | 200 + dashboard | Login 200, dashboard stats (128 books, 12 pages, 21 news, 1 enquiry) | PASS | None |
-| Admin dashboard stats | Correct counts | Matches DB (128 books, 12 pages, 21 news) | PASS | None |
-| Dropdown options CRUD (UI) | Create/edit/delete with confirm | POST 201, PATCH 200, DELETE 204; value auto-generated | PASS | Serializer `validators=[]` fix |
-| Site settings save/revert | Public API reflects change immediately | Tagline change reflected in `/api/site/`; reverted successfully | PASS | None |
-| Test inquiry email endpoint | POST `/api/admin/settings/test-inquiry-email/` | 200, honest console-backend message | PASS | Permission action `edit` |
-| Backup create (UI) | New archive + history row | `klb_backup_...zip` 490.4 KB, SUCCESSFUL | PASS | None |
-| Backup download (UI) | File download | 502193 bytes, `application/zip` | PASS | None |
-| Backup delete (UI) | Row + file removed | DB row gone, file gone, 204 | PASS | None |
-| Media upload (team photo) | POST 201 + PATCH photo | Upload 201, photo served 200 PNG, About page shows image | PASS | None |
-| Upload signature validation | Reject mismatched content | 400 "file contents do not match" | PASS | `uploads.py` signature check |
-| Enquiries admin (list/search/filter/status/note/delete) | Full CRUD + status update | PATCH status/note 200; filters working; DELETE 204 | PASS | None |
-| Subscribers admin (list/search/delete) | List + search + delete | Search works; delete 204; status now "UNSUBSCRIBED" | FIXED | StatusBadge mapping for subscribed/unsubscribed |
-| Users & permissions (create/edit/delete) | Role-based access | Editor created; nav restricted; API 403 on restricted endpoints; delete 204 | PASS | None |
-| Activity log + filters + export | CSV/XLSX/PDF downloads | Filters work; exports 200 with correct MIME | PASS | None |
-| Maintenance mode | Soft public notice, admin accessible | Field present, toggles without blocking admin | PASS | None |
-| Accessibility preferences | Persist in `localStorage` key `klb-accessibility-preferences` | Verified key usage | PASS | None |
-| Session timeout | Backend 1800s + frontend idle 25 min | Settings present | PASS | None |
+| Home page render | Hero, navigation, footer, newsletter | All render; no console errors | PASS | None |
+| Hero counters - attributes | `data-count`, `data-suffix`, `data-final` survive CMS sanitising | Present in `/api/pages/home/` HTML | FIXED | Sanitizer allow-list |
+| Hero counters - local animation | Numbers animate to final values | Sampled 50 ms: 180+ -> ... -> 1,000+ / 250+ / 1947 | FIXED | `animateCounts.js` + reduced-motion + fallback |
+| Hero counters - production | Final values displayed | `1,000+`, `250+`, `1947`; `updated_at` 2026-11-16T11:15:09+03:00; site name includes PLC | FIXED | Render Build Command runs `seed_content --refresh` |
+| Local vs Render content parity | Same content from same seed | Production was stale (Nov 12, no `data-count`); now current | FIXED | Seed runs at build time; revision gate prevents overwrites |
+| Catalogue list | Paginated cards | 128 titles; 24 per page; "Show more" works | PASS | None |
+| Catalogue search | Filtered, case-insensitive | `Mathematics` -> 9 results | PASS | None |
+| Collection filter `CBE` | Match `CBE Grade 1..4` | 19 results | FIXED | `collection__istartswith` |
+| Price sort descending | Highest first | Correct order | PASS | None |
+| Book detail | Full metadata and CTAs | All render, buy link present | PASS | None |
+| Contact form prefill | Message prefilled from `?book=` | Prefill verified; submit 201 | PASS | None |
+| Contact form validation | Reject missing/invalid fields | DRF 400 with field errors; honeypot silently accepted | PASS | None |
+| Enquiry delivery | Persist row + email to configured inbox | Row saved; email to `inquiry_recipient_email` (fallback `contact_email`); console backend locally | PASS | Recipient setting + fallback |
+| Enquiry rate limit | 10/min | 429 after limit (locmem cache) | PASS | None |
+| Newsletter subscribe | 201 + active subscriber | Subscriber active, UI confirms | PASS | None |
+| Newsletter unsubscribe | 200 + inactive subscriber | Inactive, resubscribe works, UI confirms | PASS | None |
+| Newsletter rate limit | 5/min | 429 after limit | PASS | None |
+| All public routes | Correct page, no error state | All routes load correctly | PASS | None |
+| News detail | Full article | Renders title/category/date/body | PASS | None |
+| 404 route | Friendly 404 | Renders correctly | PASS | None |
+| Missing book | Friendly error | "We could not find that book." | PASS | None |
+| Careers expiry | Expired vacancies visibly closed | `EXPIRED` badge; public card disabled, no href, closed copy | FIXED | `StatusBadge` `open`/`closing_soon`/`expired`; real row status |
+| Tenders expiry | Expired tenders visibly closed | `EXPIRED` -> edit date -> `OPEN`; public link appears/disappears | FIXED | Same badge fix |
+| Tender/resource document links | Reject backslashes | `400` "Use forward slashes (/)" then `201` with corrected path | FIXED | `validate_document_link` |
+| Resource PDFs | 200 `application/pdf` | 19/19 resource documents and 9/9 tender documents return PDF; price list 32,835,061 bytes | FIXED | Lowercase on-disk filename + URL repair |
+| Digital partners | Dashboard CRUD reflected publicly | Create visible, delete removed | PASS | None |
+| Seasonal themes | Active theme changes the public page | Body class applied; removed on expiry/delete | FIXED | `SiteContext` fetches `/api/themes/active/`; CSP-safe |
+| Sitemap / robots / health | 200 and correct content | Verified (XML, Disallow `/admin/`, `status: ok`) | PASS | None |
+| SPA deep link | Serves app shell | 200 `text/html` | PASS | None |
+| Media traversal | Blocked | `/media/../manage.py` variants -> 400/404 | PASS | None |
+| Security headers / CSP | Present and allow the chat widget | `X-Frame-Options: DENY`, `nosniff`, CSP with Tidio font/media/frame sources | FIXED | CSP extended for Tidio webfonts, sound and frame |
+| Admin login / logout | Session works; CSRF enforced | Login 200, `me` 200, logout works; missing CSRF -> 403 | PASS | None |
+| Session timeout | 30 min sliding | `SESSION_COOKIE_AGE=1800`, `SESSION_SAVE_EVERY_REQUEST=True`; idle logout at 25 min | PASS | Backend + frontend idle timer |
+| Editor restrictions | No system modules, no publish/delete | Nav hidden; restricted APIs 403; publish/delete blocked | PASS | Permission clamping |
+| Pages CRUD | Create/edit/delete + draft hiding | PATCH 200 reflected publicly; draft 404; republish 200; delete in UI works | PASS | None |
+| Books CRUD | Unique slugs, public visibility | Create 201, PATCH 200, delete 204, public 404; duplicate slug rejected | PASS | Unique slug generation + validation |
+| News CRUD | Create/edit/delete | Create 201, list count 22, delete 204 | PASS | None |
+| Careers CRUD | CRUD + expiry | Create 201, badge `EXPIRED`, delete 204 | PASS | None |
+| Tenders CRUD | CRUD + document + expiry | Create 201, PATCH 200, delete 204; invalid document rejected | PASS | `validate_document_link` |
+| Resources CRUD | CRUD + category + document | Create 201, public list includes it, delete 204 | PASS | None |
+| Digital partners CRUD | CRUD + visible flag | Create/edit/delete verified in UI | PASS | None |
+| Themes CRUD | CRUD + active window | Create/patch/delete verified; DRAFT when outside window | PASS | Theme application in frontend |
+| Dropdown options | CRUD with auto value | Blank value generated from label; duplicate rejected | FIXED | Serializer `validators=[]` |
+| Site settings | Editable, public subset only | Save/revert works; `/api/site/` exposes display settings only | FIXED | `PublicSiteSettingSerializer` |
+| Test-inquiry email | Administrators can send | 200; message states console backend when SMTP is not configured | FIXED | `permission_action = "edit"`; honest response |
+| Enquiries admin | List/filter/status/note/delete | All verified; editor cannot delete | PASS | Delete permission added |
+| Subscribers admin | List/search/delete + status | Search works; badge `SUBSCRIBED` / `UNSUBSCRIBED` | FIXED | `StatusBadge` mapping |
+| Users & permissions | Admin-only management | Create/delete verified; editor blocked with 403 | PASS | None |
+| Activity log | Filter + CSV/XLSX/PDF | Filters correct; exports 200 with correct MIME | PASS | None |
+| Backup create/download/delete | Row + real archive | 490.4 KB archive, 502,193 byte download, delete removes row and file | PASS | Unique filenames, atomic writes |
+| Backup restore | Safety backup + file restore | Automated tests: restore JSON + media, safety backup created, invalid JSON rejected | PASS | Automated coverage only (see 11.3) |
+| Uploads | Validate real file content | PNG accepted; mismatched signature rejected 400 | FIXED | Signature check in `uploads.py` |
+| Team photos | Upload, list, attach | Upload 201, public About page shows photo | PASS | None |
+| AI draft | Key + topic required; upstream errors handled | Automated tests cover success and failure paths | PASS | None |
+| Maintenance mode | Soft public notice, admin accessible | Toggles notice; dashboard unaffected | PASS | None |
+| Accessibility preferences | Persist across reloads | `localStorage` key `klb-accessibility-preferences` | PASS | None |
+| Seed refresh gate | Refresh once per seed release | First `--refresh` applies `c8e02f...`; second prints "Seed revision already applied"; dashboard edits kept; `--force-refresh` restores seed | FIXED | SHA-256 fingerprint in `SiteSetting.seed_revision` |
+| Public settings exposure | No operational secrets | Public JSON contains only display fields; staff-only fields absent | FIXED | `PublicSiteSettingSerializer` |
 
-## 4. API endpoints verified (representative)
+---
 
-Public:
-- `GET /api/site/`, `GET /api/pages/<slug>/`, `GET /api/books/`, `GET /api/books/<slug>/`
-- `GET /api/catalogue/filters/`, `GET /api/news/`, `GET /api/news/<slug>/`
+## 7. API endpoints verified
+
+**Public**
+
+- `GET /api/site/`, `GET /api/pages/<slug>/`, `GET /api/pages/home/`
+- `GET /api/books/`, `GET /api/books/<slug>/`, `GET /api/catalogue/filters/`
+- `GET /api/news/`, `GET /api/news/<slug>/`
 - `GET /api/careers/`, `GET /api/tenders/`, `GET /api/resources/`, `GET /api/digital-partners/`
+- `GET /api/themes/active/`
 - `POST /api/enquiries/`, `POST /api/newsletter/`, `POST /api/newsletter/unsubscribe/`
+- `GET /health/`, `GET /sitemap.xml`, `GET /robots.txt`
 
-Admin (super administrator):
-- `GET/POST/PATCH/DELETE /api/admin/pages/`, `/api/admin/books/`, `/api/admin/news/`, `/api/admin/careers/`, `/api/admin/tenders/`, `/api/admin/resources/`
-- `GET/PATCH /api/admin/enquiries/<id>/`, `DELETE /api/admin/enquiries/<id>/`
-- `GET/DELETE /api/admin/subscribers/<id>/`
-- `GET/POST/PATCH/DELETE /api/admin/users/`, `/api/admin/options/`
+**Admin (session authenticated)**
+
+- `GET/POST/PATCH/PUT/DELETE /api/admin/pages/` (+ duplicate)
+- `GET/POST/PATCH/DELETE /api/admin/books/`, `/news/`, `/careers/`, `/tenders/`, `/resources/`,
+  `/digital-partners/`, `/themes/`, `/options/`
+- `GET/PATCH/DELETE /api/admin/enquiries/<id>/`, `GET/DELETE /api/admin/subscribers/<id>/`
+- `GET/POST/PATCH/DELETE /api/admin/users/` (+ reset-password)
 - `GET/PATCH /api/admin/settings/`, `POST /api/admin/settings/test-inquiry-email/`
-- `GET/POST /api/admin/backup/`, `GET /api/admin/backup/<id>/download/`, `POST /api/admin/backup/<id>/restore/`, `DELETE /api/admin/backup/<id>/`
+- `GET/POST /api/admin/backup/`, `GET .../download/`, `POST .../restore/`, `DELETE .../<id>/`
 - `POST /api/admin/upload/`, `GET/PATCH /api/admin/team-photos/`
 - `GET /api/admin/activity/`, `GET /api/admin/activity/export/`
+- `POST /api/admin/ai-draft/`
 
-All tested endpoints returned expected status codes (200/201/204) and correct JSON shapes; validation errors are wrapped as `{"detail": "...", "errors": {...}}`.
+Every endpoint was exercised with valid data, and the write endpoints with invalid data to
+confirm `400` + `{"detail": "...", "errors": {...}}`.
 
-## 5. Bugs found and fixes applied
+---
 
-1. **Broken price-list download** (`assets\docs\KLB-PRICE-LIST-2026.pdf`): relative backslash URL resolved to the SPA HTML shell, and filename case mismatched on disk.  
-   - Fix: renamed file to lowercase `klb-price-list-2026.pdf`; added `validate_document_link()` in `serializers.py` for `Resource.file_url` and `Tender.document_url` (rejects backslashes, requires `/...` or `http(s)://`).  
-   - Evidence: 18/18 resource PDFs and 13/13 tender PDFs now return 200 `application/pdf`.
-2. **Catalogue collection filter** did not match `CBE Grade 1..4` for `CBE`.  
-   - Fix: `collection__istartswith` instead of exact match.
-3. **Dropdown serializer** rejected blank `value` auto-generation.  
-   - Fix: `validators = []` on `DropdownOptionSerializer`; value generated from label.
-4. **Public site settings** exposed operational fields.  
-   - Fix: `PublicSiteSettingSerializer` restricts public `/api/site/`.
-5. **Enquiry delete permission** missing in frontend RBAC.  
-   - Fix: added `delete` permission for enquiries.
-6. **Subscriber status badge** showed "DRAFT" for unsubscribed users.  
-   - Fix: StatusBadge + subscriber column map to subscribed/unsubscribed.
-7. **Test inquiry email** permission action was wrong.  
-   - Fix: `permission_action = "edit"` so administrators can use it.
-8. **Hero counter attributes** stripped by sanitizer.  
-   - Fix: allow `data-count`, `data-suffix`, `data-final`.
-9. **Stray `PY` lines** in helper scripts caused blank pages previously.  
-   - Scan: no stray `PY` lines remain.
-10. **Dev backend scripts** could accidentally target Supabase.  
-    - Fix: scripts pass `--settings=config.dev_settings`, which refuses Supabase.
+## 8. Security verification
 
-## 6. Security verification
+- Anonymous `GET`/`POST` to every `/api/admin/*` route -> 401/403; no dashboard data leaks.
+- Editor role: system modules (settings, backup, users, activity, options) hidden and
+  API-blocked; publish/delete clamped even if the payload asks for it.
+- CSRF enforced for session-authenticated writes; `/api/auth/csrf/` sets the cookie.
+- Login throttled at 5/min, enquiry 10/min, newsletter 5/min; throttling verified with 429.
+- Uploaded files validated by magic bytes, not extension (mismatched `.png` rejected).
+- Public settings serializer excludes operational values; no secrets in `/api/site/`.
+- `.env` is not committed; `config.dev_settings` refuses a Supabase `DATABASE_URL`.
+- Media traversal paths (`..`, encoded variants) rejected.
+- Security headers set: `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy,
+  Permissions-Policy, CSP with `frame-ancestors 'none'`.
+- Suspended and inactive accounts cannot sign in.
 
-- Unauthenticated `GET /api/admin/*` → 403; anonymous cannot reach protected pages.
-- Editor role: nav hides Settings/Backup/Users/Activity/Options; API returns 403 for those modules; read access limited to permitted modules (verified via `/api/auth/me/` permissions and live requests).
-- Suspended/inactive accounts cannot sign in (covered by unit tests).
-- Upload validation checks file signatures, not just extensions (verified 400 on mismatched content).
-- No `.env` secrets committed; `DATABASE_URL` points to Supabase but dev settings refuse to run against it.
+---
 
-## 7. Outstanding issues / external configuration
+## 9. Production (Render) verification
 
-1. **Real SMTP delivery** requires user-supplied `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` (currently console backend → emails logged to server console).
-2. **Production Supabase row** `Resource id 1` has `file_url = "assets\docs\KLB-PRICE-LIST-2026.pdf"` (backslash). Local DB is correct (`/assets/docs/klb-price-list-2026.pdf`). Correct this row in the production admin after deploy; the new validator prevents new bad values.
-3. **Render deployment** not executed from this environment (requires push/deploy access).
-4. Empty-state wording on subscribers search ("No subscribers yet" even when filtered) is cosmetic; not blocking.
+Verified against `https://klb-website.onrender.com` after the Render Build Command was
+corrected to run the seed:
 
-## 8. Exact PowerShell commands
+| Check | Observed |
+|---|---|
+| `/health/` | 200, `{"status":"ok"}` |
+| `/api/pages/home/` | `updated_at = 2026-11-16T11:15:09.653870+03:00`, contains `data-count` |
+| `/api/site/` | `site_name = "Kenya Literature Bureau PLC"` |
+| `/api/themes/active/` | 200 (endpoint deployed) |
+| Hero counters | 3 elements; final text `1,000+`, `250+`, `1947` |
+| Static JS | `assets/index-*.js` contains `data-count`, `data-final`, `prefers-reduced-motion` |
 
-### 8.1 Virtual environment and dependencies
+**Note on the counter animation in automated production tabs:** in the remote inspection
+tab, `requestAnimationFrame` did not fire at all (0 frames in 2.5 s), so the numbers jumped
+from `0` to the final values at ~2.3 s via the `setTimeout` safety net. A local foreground
+tab animated with intermediate values as designed. This is Chromium background/remote-tab
+throttling, not a site defect; the final values are always rendered.
+
+---
+
+## 10. Root causes and fixes applied
+
+1. **Stale production content (local vs Render mismatch).** The Render service is a manual
+   service, so `render.yaml` was not applied and its Build Command never ran
+   `seed_content`. Local and production therefore used different data.
+   - Fix: Build Command now runs `python manage.py seed_content --refresh` after migrate;
+     documented below for the dashboard.
+   - Follow-on risk: refreshing on every deploy would overwrite dashboard edits. Added a
+     SHA-256 fingerprint of `cms-seed.json` + `books.json` stored in
+     `SiteSetting.seed_revision` (`migration 0016`). A release applies once; later deploys
+     print "Seed revision already applied; keeping dashboard edits." `--force-refresh`
+     deliberately restores the seed copy.
+   - Evidence: 4 new tests (`test_seed_content.py`) prove refresh-once, edit retention,
+     force refresh and URL repair.
+2. **Seasonal themes were never applied publicly.** `/api/themes/active/` worked but the
+   frontend never called it.
+   - Fix: `SiteContext` fetches the active theme and adds its `css_class` to `<body>`,
+     removing it on expiry, deletion, or theme change.
+   - Evidence: body class `theme-audit` while active; endpoint `{active:false}` and no class
+     once the end date passed.
+3. **Expired careers/tenders looked open in the dashboard.** The badge mapped expired to
+   `DRAFT` and closing-soon to `new`.
+   - Fix: `StatusBadge` handles `open`, `closing_soon`, `expired`; columns pass the real row
+     status; careers lead copy corrected.
+4. **Price-list download returned the SPA HTML shell.** The seed used backslashes and the
+   file on disk was `KLB-PRICE-LIST-2026.pdf`.
+   - Fix: renamed file to lowercase; `validate_document_link()` rejects backslashes and
+     requires a root-relative or `http(s)` URL for `Resource.file_url` and
+     `Tender.document_url`; seed command repairs existing backslash URLs.
+   - Evidence: `/assets/docs/klb-price-list-2026.pdf` -> 200, `application/pdf`,
+     32,835,061 bytes, `%PDF-1.7`.
+5. **Public `/api/site/` exposed operational settings.** Fix: `PublicSiteSettingSerializer`.
+6. **Enquiries had no delete permission in the frontend RBAC map.** Fix: added `delete`.
+7. **Book slugs could collide.** Fix: unique slug generation and duplicate-slug validation.
+8. **Upload validation trusted the extension.** Fix: file-signature checks.
+9. **Dropdown options rejected blank `value`.** Fix: disable the auto unique-together
+   validator; generate `value` from the label, then run the custom duplicate check.
+10. **Test-inquiry email was blocked for administrators.** Fix: `permission_action = "edit"`;
+    the response is honest about the console backend when SMTP is absent.
+11. **Subscriber badge reused `published`/`draft`.** Fix: `subscribed`/`unsubscribed`.
+12. **Hero counter attributes were stripped by the sanitizer.** Fix: allow `data-count`,
+    `data-suffix`, `data-final`; `animateCounts.js` handles reduced motion and a throttled
+    `requestAnimationFrame`.
+13. **Catalogue `CBE` filter missed `CBE Grade 1..4`.** Fix: `collection__istartswith`
+    with vendor-aware handling.
+14. **Dev scripts could target Supabase.** Fix: `config.dev_settings` guard.
+15. **Tidio chat widget produced CSP console errors** for its webfonts, notification sound
+    and frame. Fix: CSP `font-src`, `media-src`, `frame-src` allow `code.tidio.co` /
+    `*.tidio.co`; regression test added.
+
+---
+
+## 11. Blocked items and remaining external steps
+
+### 11.1 Real SMTP delivery - BLOCKED (credentials)
+
+Emails currently use Django's console backend (visible in server logs) because `EMAIL_HOST`
+is blank. To switch to real delivery, set these in the Render dashboard
+(Environment -> Add Environment Variable) and redeploy:
+
+```
+EMAIL_HOST=<smtp host>
+EMAIL_PORT=587
+EMAIL_HOST_USER=<smtp user>
+EMAIL_HOST_PASSWORD=<smtp password>
+EMAIL_USE_TLS=True
+DEFAULT_FROM_EMAIL=<verified sender address>
+```
+
+Then use **Admin -> Settings -> Send test email** and confirm the message arrives.
+
+### 11.2 Deploying these newest fixes - BLOCKED (deploy access)
+
+The fixes in section 10 (seed gate, theme application, badges, CSP) are committed locally
+but not yet pushed. Pushing to the connected branch or clicking **Manual Deploy** is
+required. Post-deploy checks are in 12.8.
+
+### 11.3 Live UI backup restore - not executed in the browser
+
+Create/download/delete were executed in the UI. Restore is covered by automated tests:
+`test_restore_media_creates_safety_backup_and_restores_files` and the invalid-JSON
+rejection test. To exercise it manually, upload one of the downloaded archives in
+**Admin -> Backups -> Upload & restore** and confirm the safety backup row appears.
+
+### 11.4 Cosmetic items
+
+- The subscribers search empty-state text still reads "No subscribers yet" when a filter
+  matches nothing. Cosmetic only.
+- Supabase may still hold legacy rows whose `file_url` used backslashes. Running
+  `seed_content --refresh` on the new release repairs them; the validator blocks new ones.
+
+---
+
+## 12. Exact PowerShell commands
+
+Run each block from the directory shown. Do not commit or print `.env` contents.
+
+### 12.1 Backend virtual environment and dependencies
+
 ```powershell
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\backend"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 8.2 Django checks and tests
+### 12.2 Django checks, migrations and tests
+
 ```powershell
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\backend"
 .\.venv\Scripts\python.exe manage.py check --settings=config.test_settings
 .\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=config.test_settings
 .\.venv\Scripts\python.exe manage.py test --settings=config.test_settings
 .\.venv\Scripts\python.exe manage.py test apps.content.test_audit --settings=config.test_settings
+.\.venv\Scripts\python.exe manage.py test apps.content.test_seed_content --settings=config.test_settings
 ```
 
-### 8.3 Migrations
+### 12.3 Local database: migrate and seed
+
 ```powershell
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\backend"
+$env:DATABASE_URL = "postgres://postgres:1234@127.0.0.1:5432/klb_verify"
 .\.venv\Scripts\python.exe manage.py migrate --settings=config.dev_settings
+.\.venv\Scripts\python.exe manage.py seed_content --refresh --settings=config.dev_settings
 ```
 
-### 8.4 Frontend tests and build
+`--refresh` applies a new seed release once. Use `--force-refresh` only when you intend to
+discard dashboard edits to pages, sections, news and settings.
+
+### 12.4 Frontend dependencies, lint, tests and build
+
 ```powershell
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\frontend"
-npm install
+npm ci
 npm run lint
 npm test
 npm run build
 ```
 
-### 8.5 Local servers
+### 12.5 Run the local site (two terminals)
+
 ```powershell
-# Backend (terminal 1) – always use dev settings to avoid touching Supabase
+# Terminal 1 - backend (dev settings refuse to run against Supabase)
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\backend"
 $env:DATABASE_URL = "postgres://postgres:1234@127.0.0.1:5432/klb_verify"
+$env:DJANGO_DEBUG = "True"
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000 --settings=config.dev_settings
-
-# Frontend (terminal 2)
-cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\frontend"
-npm run dev
 ```
 
-### 8.6 Git commit and push
+```powershell
+# Terminal 2 - frontend
+cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026\frontend"
+npm run dev -- --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:5173/` and `http://127.0.0.1:5173/admin/login`.
+
+### 12.6 Review and push the fixes
+
 ```powershell
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026"
-git status
+git status --short
+git diff --check
 git add -A
-git commit -m "Full functional audit: fixes, tests, and report"
+git commit -m "fix: gate seed refresh per release, apply seasonal themes, correct expiry badges and CSP"
 git push origin main
 ```
 
-### 8.7 Render deploy
+### 12.7 Render deployment
+
+The Render service is a **manual service**, so `render.yaml` is reference only. Set the
+Build Command in the Render dashboard:
+
+```
+cd frontend && npm ci && npm run build && cd ../backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_content --refresh
+```
+
+Start Command:
+
+```
+cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
+```
+
+Confirm these environment variables exist (values never committed):
+
+```
+PYTHON_VERSION=3.12.6
+NODE_VERSION=20.11.1
+DJANGO_DEBUG=False
+DJANGO_SECURE_SSL=True
+DJANGO_SECURE_COOKIES=True
+DJANGO_ALLOWED_HOSTS=klb-website.onrender.com
+DJANGO_CSRF_TRUSTED_ORIGINS=https://klb-website.onrender.com
+DATABASE_URL=<from the Render PostgreSQL instance>
+MEDIA_DIR=/opt/render/project/src/data/media
+BACKUP_DIR=/opt/render/project/src/data/backups
+SEED_ADMIN_EMAIL=<production admin email>
+SEED_ADMIN_PASSWORD=<set in dashboard only>
+SESSION_TIMEOUT_SECONDS=1800
+EMAIL_HOST / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD / DEFAULT_FROM_EMAIL (see 11.1)
+```
+
+Then click **Manual Deploy -> Clear build cache & deploy**. If you use the Render CLI
+instead:
+
 ```powershell
-# Trigger a manual deploy from the Render dashboard, or via Render CLI:
 cd "C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026"
-render deploy
+render deploys create <service-id> --wait
 ```
-Ensure Render environment variables include `DATABASE_URL`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `EMAIL_*`, `DEFAULT_FROM_EMAIL`, `SESSION_COOKIE_AGE`.
 
-### 8.8 Post-deploy verification
+### 12.8 Post-deploy verification
+
 ```powershell
-Invoke-WebRequest -UseBasicParsing "https://<your-render-url>/health/" | Select-Object StatusCode, Content
-Invoke-WebRequest -UseBasicParsing "https://<your-render-url>/" | Select-Object StatusCode
+$base = "https://klb-website.onrender.com"
+(Invoke-WebRequest -UseBasicParsing "$base/health/").Content
+$home = (Invoke-WebRequest -UseBasicParsing "$base/api/pages/home/").Content | ConvertFrom-Json
+"data-count present: " + ($home.sections.html -join " ").Contains("data-count")
+"updated_at: " + $home.updated_at
+$site = (Invoke-WebRequest -UseBasicParsing "$base/api/site/").Content | ConvertFrom-Json
+"site_name: " + $site.settings.site_name
+(Invoke-WebRequest -UseBasicParsing "$base/api/themes/active/").StatusCode
+$pdf = Invoke-WebRequest -UseBasicParsing "$base/assets/docs/klb-price-list-2026.pdf" -Method Head
+"price list: $($pdf.StatusCode) $($pdf.Headers['Content-Type'])"
 ```
-Then log in to `/admin/login` with the production admin account and verify dashboard counts, one content edit, and one backup download.
 
-## 9. Summary
+Then, in a normal browser tab (not a background tab), confirm the hero counters animate
+from small numbers to `1,000+`, `250+`, `1947`; confirm an expired career/tender shows the
+`EXPIRED` badge and a closed public card; create a theme dated today and confirm the body
+class appears, then delete it.
 
-- Features tested: 40+ (public pages, catalogue, forms, newsletter, admin CRUD, backups, uploads, users/permissions, activity log, exports).
-- Automated: 123 backend tests OK + 53 audit tests OK + 11 frontend tests OK.
-- Bugs fixed: 10 (see section 5).
-- Remaining: SMTP configuration, production resource URL correction, Render deploy.
+---
+
+## 13. Repeatable verification checklist
+
+1. `manage.py check` -> 0 issues.
+2. `makemigrations --check` -> no changes.
+3. `manage.py test` -> 128 tests OK.
+4. `npm run lint` -> 0 syntax errors.
+5. `npm test` -> 11/11.
+6. `npm run build` -> success.
+7. Local browser: home counters, catalogue search/filter/sort, contact form, newsletter,
+   one admin create/edit/delete.
+8. Push and deploy; run 12.8.
+9. Configure SMTP (11.1) and send the test email.
+
+---
+
+## 14. Test artefact map
+
+| File | Purpose |
+|---|---|
+| `backend/apps/content/test_audit.py` | 54 executable endpoint/permission/security tests |
+| `backend/apps/content/test_seed_content.py` | 4 seed release-gate tests |
+| `backend/apps/content/tests.py` | Backup, settings, theme and upload tests |
+| `backend/apps/accounts/tests.py` | Authentication, roles, permissions, activity tests |
+| `frontend/tests/lib.test.mjs` | 11 RBAC, permission and formatting unit tests |
+| `frontend/scripts/check-syntax.mjs` | esbuild parse check used by `npm run lint` |
+| `render.yaml` | Reference build/start commands and environment variable names |
+| `backend/apps/content/migrations/0016_sitesetting_seed_revision.py` | Adds the seed fingerprint field |

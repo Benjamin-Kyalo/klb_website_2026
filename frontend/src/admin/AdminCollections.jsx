@@ -205,7 +205,7 @@ const careerColumns = [
   { key: "department", label: "Department" },
   { key: "location", label: "Location" },
   { key: "closing_date", label: "Closes", render: (row) => (row.closing_date ? formatDate(row.closing_date) : "—") },
-  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status === "expired" ? "draft" : row.status === "closing_soon" ? "new" : "published"} /> },
+  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
 ];
 
 export function AdminCareers() {
@@ -214,7 +214,7 @@ export function AdminCareers() {
       resource="careers"
       module="careers"
       title="Careers"
-      lead="Vacancies appear on the careers page. Closed vacancies stay in the dashboard but are hidden from the public list."
+      lead="Vacancies appear on the careers page. Expired vacancies are shown as closed and can no longer be applied for."
       singular="Vacancy"
       columns={careerColumns}
       fields={careerFields}
@@ -251,7 +251,7 @@ const tenderColumns = [
   { key: "category", label: "Category" },
   { key: "published_on", label: "Published", render: (row) => (row.published_on ? formatDate(row.published_on) : "—") },
   { key: "closing_date", label: "Closing", render: (row) => (row.closing_date ? formatDate(row.closing_date) : "—") },
-  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status === "expired" ? "draft" : row.status === "closing_soon" ? "new" : "published"} /> },
+  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
 ];
 
 export function AdminTenders() {

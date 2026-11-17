@@ -29,7 +29,11 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
                 "script-src 'self' 'unsafe-inline' https://code.tidio.co https://*.tidio.co; "
                 "style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: https:; "
-                "font-src 'self' data:; "
+                # The Tidio live-chat widget loads its webfonts, notification
+                # sound and chat frame from these hosts.
+                "font-src 'self' data: https://code.tidio.co https://*.tidio.co; "
+                "media-src 'self' https://code.tidio.co https://*.tidio.co; "
+                "frame-src 'self' https://code.tidio.co https://*.tidio.co; "
                 "connect-src 'self' https://code.tidio.co https://*.tidio.co wss://*.tidio.co; "
                 "frame-ancestors 'none';"
             )

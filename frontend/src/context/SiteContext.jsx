@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getSite } from "../lib/api.js";
+import { getActiveTheme, getSite } from "../lib/api.js";
 
 const SiteContext = createContext(null);
 
@@ -30,15 +30,20 @@ const SITE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export function SiteProvider({ children }) {
   const [site, setSite] = useState(siteCache);
+  const [activeTheme, setActiveTheme] = useState(null);
   const [loading, setLoading] = useState(!siteCache);
   const [error, setError] = useState(null);
 
   const reload = useCallback(async () => {
     try {
-      const data = await getSite();
+      const [data, theme] = await Promise.all([
+        getSite(),
+        getActiveTheme().catch(() => null),
+      ]);
       siteCache = data;
       siteCacheTime = Date.now();
       setSite(data);
+      setActiveTheme(theme && theme.css_class ? theme : null);
       setError(null);
       return data;
     } catch (err) {
@@ -52,6 +57,15 @@ export function SiteProvider({ children }) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Seasonal themes add their CSS class to <body> while they are active.
+  // The class is removed when the campaign expires or the theme is deleted.
+  useEffect(() => {
+    const classes = (activeTheme?.css_class || "").split(/\s+/).filter(Boolean);
+    if (!classes.length) return undefined;
+    classes.forEach((name) => document.body.classList.add(name));
+    return () => classes.forEach((name) => document.body.classList.remove(name));
+  }, [activeTheme]);
 
   const settings = { ...FALLBACK_SETTINGS, ...(site?.settings || {}) };
   const navigation = site?.navigation?.length ? site.navigation : [];

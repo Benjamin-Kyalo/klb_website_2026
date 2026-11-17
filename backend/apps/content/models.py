@@ -399,6 +399,10 @@ class SiteSetting(models.Model):
     navigation = models.JSONField(default=list, blank=True)
     footer_columns = models.JSONField(default=list, blank=True)
     statistics = models.JSONField(default=list, blank=True)
+    # Fingerprint of the seed files last applied to this database. Deploys run
+    # `seed_content --refresh`; the fingerprint stops a deploy from silently
+    # overwriting content edited in the dashboard after the last seed release.
+    seed_revision = models.CharField(max_length=64, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

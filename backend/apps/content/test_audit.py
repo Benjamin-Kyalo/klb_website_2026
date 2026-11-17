@@ -26,7 +26,7 @@ from django.conf import settings
 from django.core import mail
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -434,6 +434,21 @@ class PublicContentAuditTests(AuditFixtures):
         for path in ("/media/../manage.py", "/media/%2e%2e/manage.py", "/media/..%2F..%2Fmanage.py"):
             response = self.anon.get(path)
             self.assertIn(response.status_code, (400, 404), f"{path} returned {response.status_code}")
+
+    @override_settings(DEBUG=False)
+    def test_security_headers_allow_the_live_chat_widget(self):
+        response = self.anon.get("/health/")
+        csp = response["Content-Security-Policy"]
+        self.assertIn("default-src 'self'", csp)
+        self.assertIn("script-src 'self' 'unsafe-inline' https://code.tidio.co", csp)
+        # The Tidio widget needs its own webfonts, notification sound and frame.
+        self.assertIn("font-src 'self' data: https://code.tidio.co", csp)
+        self.assertIn("media-src 'self' https://code.tidio.co", csp)
+        self.assertIn("frame-src 'self' https://code.tidio.co", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertEqual(response["X-Frame-Options"], "DENY")
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertIn("camera=()", response["Permissions-Policy"])
 
 
 class PublicFormAuditTests(AuditFixtures):
