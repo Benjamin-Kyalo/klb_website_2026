@@ -24,7 +24,7 @@ live Render deployment) - not inferred from reading code.
 | Frontend production build | Success (~2.7 s), `dist/` generated |
 | Public browser journeys | All routes, catalogue, forms, newsletter, 404, PDFs verified |
 | Admin browser journeys | Every module's create / edit / delete exercised in the UI |
-| Production (Render) | Commit `e51995d` deployed: current content, hero final values `1,000+ / 250+ / 1947`, active theme class applied, 0 console errors |
+| Production (Render) | `4c3925e` pushed; post-push `/health/` 200, 128 books, 8 home sections, prior `updated_at` retained, theme + PDF still served |
 | Remaining blockers | Real SMTP credentials, live UI backup restore (see section 11) |
 
 Three defects were found *because* this round executed the app rather than reading it:
@@ -278,6 +278,29 @@ tab animated with intermediate values as designed. This is Chromium background/r
 throttling, not a site defect; the final values are always rendered, and the live production
 page displays them correctly.
 
+### 9.1 Data-safety commit `4c3925e` - post-push production checks
+
+After pushing the non-destructive seed commit, the live service was checked again:
+
+| Check | Observed after the push |
+|---|---|
+| `/health/` | 200, `{"status":"ok"}` |
+| `/api/pages/home/` | 8 sections, `updated_at` still `2026-11-17T08:45:21.745034+03:00`, `data-count` present |
+| `/api/books/?page_size=1` | `count = 128` (no catalogue rows lost) |
+| `/api/site/` | Site name, navigation, footer and statistics returned unchanged |
+| `/api/themes/active/` | `theme-christmas` still active |
+| Price-list PDF | 200, `application/pdf`, 32,835,061 bytes |
+
+The unchanged `updated_at` and counts are the expected result of a create-only deploy: the
+Build Command runs `migrate` then `seed_content --refresh`, which added nothing because all
+seed rows already exist.
+
+**Verification limit:** this environment has no Render API token or Shell access, so the
+deploy's build log cannot be read back. The seed behaviour itself was executed in the full
+136-test suite, in targeted tests (section 10.1) and against the local PostgreSQL database;
+production runs the same pushed commit. If the Render dashboard shows the build failed,
+open **Logs** and re-run **Manual Deploy -> Clear build cache & deploy**.
+
 ---
 
 ## 10. Root causes and fixes applied
@@ -418,9 +441,11 @@ Then use **Admin -> Settings -> Send test email** and confirm the message arrive
 
 Commit `e51995d` was pushed to `origin/main` and Render's automatic deploy picked it up.
 The production checks in section 9 confirm the backend and frontend fixes are live (new
-bundle `index-DlE9K2Cy.js`, theme class applied, new CSP, price-list PDF). If automatic
-deploys are ever disabled, use **Manual Deploy -> Clear build cache & deploy** with the
-Build Command in 12.7.
+bundle `index-DlE9K2Cy.js`, theme class applied, new CSP, price-list PDF).
+
+The later data-safety commit `4c3925e` (migration `0017`, non-destructive `seed_content`)
+was pushed on top; section 9.1 records the post-push checks. If automatic deploys are ever
+disabled, use **Manual Deploy -> Clear build cache & deploy** with the Build Command in 12.7.
 
 ### 11.3 Live UI backup restore - not executed in the browser
 
