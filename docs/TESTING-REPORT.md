@@ -16,24 +16,27 @@ live Render deployment) - not inferred from reading code.
 
 | Area | Result |
 |---|---|
-| Backend automated suite | **128 tests, OK** (0 failures, 0 errors) |
+| Backend automated suite | **136 tests, OK** (0 failures, 0 errors) |
 | Django system check | 0 issues |
 | Migration drift | "No changes detected" |
 | Frontend lint (esbuild parse) | 55 files, no syntax errors |
 | Frontend unit tests | **11 / 11 pass** |
-| Frontend production build | Success (~3.4 s), `dist/` generated |
+| Frontend production build | Success (~2.7 s), `dist/` generated |
 | Public browser journeys | All routes, catalogue, forms, newsletter, 404, PDFs verified |
 | Admin browser journeys | Every module's create / edit / delete exercised in the UI |
 | Production (Render) | Commit `e51995d` deployed: current content, hero final values `1,000+ / 250+ / 1947`, active theme class applied, 0 console errors |
 | Remaining blockers | Real SMTP credentials, live UI backup restore (see section 11) |
 
-Two defects were found *because* this round executed the app rather than reading it:
+Three defects were found *because* this round executed the app rather than reading it:
 
 1. Production was serving stale content because the Render **Build Command** was not
    running `seed_content` at all (local and Render disagreed). The command is now part of
-   the build, gated so it cannot overwrite later dashboard edits.
+   the build; `--refresh` is create-only and cannot overwrite dashboard edits.
 2. Seasonal themes had a working API but the public frontend never consumed it. Themes are
    now applied to `<body>` and removed when the campaign window closes.
+3. `seed_content` itself destroyed dashboard content: `--refresh` deleted every section on
+   seed pages, rewrote seed settings and news, and `--reset` truncated whole tables. All
+   destructive calls are removed (section 10.1).
 
 ---
 
@@ -49,7 +52,7 @@ Two defects were found *because* this round executed the app rather than reading
 | Local frontend | `http://127.0.0.1:5173` (Vite proxy for `/api`, `/media`, `/assets` is served from `public/`) |
 | Local admin | `admin@klb.com` / `Klb@2026` (super administrator) |
 | Local DB state | 1 user, 128 books, 12 pages, 21 news items, 19 resources, 9 tenders, 1 career, 0 enquiries, 0 subscribers |
-| Local migration | `content.0016_sitesetting_seed_revision` applied |
+| Local migration | `content.0017_section_seed_key` applied |
 | Seed revision applied | `c8e02fdec79007028bf7dd4523e0fc32` |
 | Production URL | `https://klb-website.onrender.com` |
 
@@ -64,16 +67,16 @@ partner, page or enquiry rows remain in the local database.
 |---|---|---|
 | Django system check | `manage.py check --settings=config.test_settings` | `System check identified no issues (0 silenced).` |
 | Migration drift | `manage.py makemigrations --check --dry-run --settings=config.test_settings` | `No changes detected` |
-| Full backend suite | `manage.py test --settings=config.test_settings` | `Ran 128 tests in 11.163s` -> `OK` |
+| Full backend suite | `manage.py test --settings=config.test_settings` | `Ran 136 tests in 12.935s` -> `OK` |
 | Accounts app | `manage.py test apps.accounts --settings=config.test_settings` | `Ran 32 tests ... OK` |
-| Content app | `manage.py test apps.content --settings=config.test_settings` | `Ran 96 tests ... OK` |
+| Content app | `manage.py test apps.content --settings=config.test_settings` | `Ran 104 tests ... OK` |
 | Endpoint/permission audit | `manage.py test apps.content.test_audit --settings=config.test_settings` | `Ran 54 tests ... OK` |
-| Seed release gate | `manage.py test apps.content.test_seed_content --settings=config.test_settings` | `Ran 4 tests ... OK` |
+| Seed release gate | `manage.py test apps.content.test_seed_content --settings=config.test_settings` | `Ran 12 tests ... OK` |
 | Frontend lint | `npm run lint` | `Parsed 55 source files with esbuild. No syntax errors.` |
 | Frontend unit tests | `npm test` | `tests 11 / pass 11 / fail 0` |
 | Frontend build | `npm run build` | `built in 3.44s` |
 
-The 128 backend tests cover: public content and status filtering, catalogue search /
+The 136 backend tests cover: public content and status filtering, catalogue search /
 filters / pagination / sorting, book detail, careers and tender expiry windows, resources,
 digital partners, active theme window, sitemap / robots / health / SPA shell, media
 traversal, public forms (validation, honeypot, rate limits, email recipients),
@@ -198,7 +201,7 @@ security boundaries.
 | AI draft | Key + topic required; upstream errors handled | Automated tests cover success and failure paths | PASS | None |
 | Maintenance mode | Soft public notice, admin accessible | Toggles notice; dashboard unaffected | PASS | None |
 | Accessibility preferences | Persist across reloads | `localStorage` key `klb-accessibility-preferences` | PASS | None |
-| Seed refresh gate | Refresh once per seed release | First `--refresh` applies `c8e02f...`; second prints "Seed revision already applied"; dashboard edits kept; `--force-refresh` restores seed | FIXED | SHA-256 fingerprint in `SiteSetting.seed_revision` |
+| Seed refresh gate | Deploy can never erase dashboard content | `--refresh` is create-only on every deploy; a new seed revision still keeps dashboard edits; `--force-refresh` rewrites only seed-origin pages/sections/news in place; `--reset` is rejected without `--confirm-reset`; UI-created pages, sections, books, news, careers, tenders, resources, partners and settings survive every mode | FIXED | Removed all `.delete()` calls; `Section.seed_key` ownership marker (migration `0017`); automatic JSON safety dump before restore modes; 12 seed tests |
 | Public settings exposure | No operational secrets | Public JSON contains only display fields; staff-only fields absent | FIXED | `PublicSiteSettingSerializer` |
 
 ---
@@ -289,8 +292,11 @@ page displays them correctly.
      `SiteSetting.seed_revision` (`migration 0016`). A release applies once; later deploys
      print "Seed revision already applied; keeping dashboard edits." `--force-refresh`
      deliberately restores the seed copy.
-   - Evidence: 4 new tests (`test_seed_content.py`) prove refresh-once, edit retention,
-     force refresh and URL repair.
+   - Data-loss follow-up: the original `--refresh` still deleted every section on a seed
+     page and rewrote seed settings, and `--reset` deleted whole tables. All destructive
+     calls are gone (see 10.1).
+   - Evidence: 12 tests (`test_seed_content.py`) prove create-only deploys, edit retention,
+     in-place restore, confirmation gating, safety dumps and UI-content preservation.
 2. **Seasonal themes were never applied publicly.** `/api/themes/active/` worked but the
    frontend never called it.
    - Fix: `SiteContext` fetches the active theme and adds its `css_class` to `<body>`,
@@ -326,6 +332,66 @@ page displays them correctly.
 15. **Tidio chat widget produced CSP console errors** for its webfonts, notification sound
     and frame. Fix: CSP `font-src`, `media-src`, `frame-src` allow `code.tidio.co` /
     `*.tidio.co`; regression test added.
+
+### 10.1 Dashboard content is never deleted or overwritten by seeding
+
+The user reported that content created through the dashboard disappeared after code
+changes and deploys. Root causes found in `seed_content.py`:
+
+| Root cause | Previous effect | Fix |
+|---|---|---|
+| `seed_pages(refresh=True)` ran `page.sections.all().delete()` | Every dashboard section on a seed page was destroyed on each refresh | Sections are matched by `seed_key` and refreshed in place; nothing is deleted |
+| `seed_pages(refresh=True)` recreated all seed sections | Dashboard HTML under a seed label was replaced | `--refresh` is create-only; only `--force-refresh` rewrites seed-origin sections |
+| `seed_news(refresh=True)` rewrote seed articles | Edited seed articles were reverted | Only the explicit restore modes rewrite seed news |
+| `seed_settings` refresh rewrote `navigation`, `footer_columns`, `statistics` and SEO copy | Dashboard settings reverted | Existing settings are never overwritten; only blank values are filled |
+| `--reset` deleted `Section`, `Page`, `Book`, `News`, `Career`, `Tender`, `Resource`, `SiteSetting` | Entire site content wiped | All `.delete()` calls removed; `--reset` now restores in place and requires `--confirm-reset` |
+| No recovery point before a forced rewrite | A mistaken command was unrecoverable | A JSON `dumpdata` safety file is written to `BACKUP_ROOT` before every restore mode |
+
+Current seed contract:
+
+- Plain `seed_content` and `seed_content --refresh`: create missing rows only. Existing
+  pages, sections, books, news, careers, tenders, resources, partners, settings and
+  administrator accounts are left exactly as they are. This is what Render runs on every
+  deploy.
+- `seed_content --force-refresh`: restores the seed copy of seed-origin pages, sections and
+  news in place. It creates missing rows, updates rows whose `seed_key` matches the seed
+  file, keeps dashboard-added sections (blank `seed_key`), keeps every other dashboard row,
+  and keeps every non-blank setting. A safety dump is written first.
+- `seed_content --reset`: rejected unless `--confirm-reset` is also passed. With both flags
+  it behaves like `--force-refresh`; it never truncates tables.
+- No command deletes administrator accounts. `flush` is no longer recommended anywhere;
+  `docs/TROUBLESHOOTING.md` now requires a backup and offers non-destructive repairs.
+
+Executed evidence (`.\.venv\Scripts\python.exe manage.py test apps.content.test_seed_content
+--settings=config.test_settings`):
+
+```
+Found 12 test(s).
+Ran 12 tests in 6.366s
+OK
+```
+
+The 12 tests prove: refresh-once retention, create-only behaviour when the fingerprint
+changes, plain-seed retention, backslash repair, forced restore of seed rows,
+preservation of dashboard-created pages/sections/news/careers/tenders/resources/partners/
+books, confirmation gating, confirmed reset preserving dashboard content, rejection of
+combined flags, settings preservation, and the safety dump containing the dashboard page.
+
+Local PostgreSQL verification (`klb_verify`, 2026-11-17), comparing a snapshot before and
+after a real `seed_content --refresh --settings=config.dev_settings`:
+
+```
+Seed revision already applied; keeping dashboard edits.
+  pages: 0  books: 0  news: 0  careers: 0  tenders: 0  resources: 0  digital partners: 0
+BEFORE: pages=12 sections=61 books=128 news=21 careers=1 tenders=9 resources=19 partners=6
+AFTER : pages=12 sections=61 books=128 news=21 careers=1 tenders=9 resources=19 partners=6
+```
+
+Every page `updated_at`, `SiteSetting.updated_at` (`2026-11-16T07:05:22.484529+00:00`),
+the section HTML hash (`75b21b343df633b2`) and the news body hash were identical before and
+after. All 61 existing sections were adopted under a `seed_key` without changing their
+HTML or order; 0 sections remain unowned, so a later forced restore cannot touch content
+an editor adds (new sections stay blank-keyed).
 
 ---
 
@@ -368,7 +434,7 @@ rejection test. To exercise it manually, upload one of the downloaded archives i
 - The subscribers search empty-state text still reads "No subscribers yet" when a filter
   matches nothing. Cosmetic only.
 - Supabase may still hold legacy rows whose `file_url` used backslashes. Running
-  `seed_content --refresh` on the new release repairs them; the validator blocks new ones.
+  `seed_content` (plain or `--refresh`) repairs them; the validator blocks new ones.
 
 ---
 
@@ -406,8 +472,11 @@ $env:DATABASE_URL = "postgres://postgres:1234@127.0.0.1:5432/klb_verify"
 .\.venv\Scripts\python.exe manage.py seed_content --refresh --settings=config.dev_settings
 ```
 
-`--refresh` applies a new seed release once. Use `--force-refresh` only when you intend to
-discard dashboard edits to pages, sections, news and settings.
+`--refresh` is create-only and runs on every deploy; it never overwrites dashboard
+content. Use `--force-refresh` only when you deliberately want to restore the seed copy of
+seed-origin pages, sections and news. It keeps dashboard-created rows and edited settings
+and writes a JSON safety dump to `backend\backups` first. `--reset` requires
+`--confirm-reset` and performs the same in-place restore; it never truncates tables.
 
 ### 12.4 Frontend dependencies, lint, tests and build
 
@@ -516,7 +585,7 @@ class appears, then delete it.
 
 1. `manage.py check` -> 0 issues.
 2. `makemigrations --check` -> no changes.
-3. `manage.py test` -> 128 tests OK.
+3. `manage.py test` -> 136 tests OK.
 4. `npm run lint` -> 0 syntax errors.
 5. `npm test` -> 11/11.
 6. `npm run build` -> success.
@@ -532,7 +601,7 @@ class appears, then delete it.
 | File | Purpose |
 |---|---|
 | `backend/apps/content/test_audit.py` | 54 executable endpoint/permission/security tests |
-| `backend/apps/content/test_seed_content.py` | 4 seed release-gate tests |
+| `backend/apps/content/test_seed_content.py` | 12 seed data-safety tests |
 | `backend/apps/content/tests.py` | Backup, settings, theme and upload tests |
 | `backend/apps/accounts/tests.py` | Authentication, roles, permissions, activity tests |
 | `frontend/tests/lib.test.mjs` | 11 RBAC, permission and formatting unit tests |

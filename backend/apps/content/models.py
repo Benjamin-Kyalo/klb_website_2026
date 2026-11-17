@@ -45,6 +45,10 @@ class Section(models.Model):
     html = models.TextField(blank=True)
     settings = models.JSONField(default=dict, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
+    # Set only for sections created by seed_content. A blank value marks a
+    # section an editor added in the dashboard, which the seed command must
+    # never update or delete.
+    seed_key = models.CharField(max_length=120, blank=True, default="", editable=False, db_index=True)
 
     class Meta:
         ordering = ["sort_order", "id"]
@@ -399,9 +403,9 @@ class SiteSetting(models.Model):
     navigation = models.JSONField(default=list, blank=True)
     footer_columns = models.JSONField(default=list, blank=True)
     statistics = models.JSONField(default=list, blank=True)
-    # Fingerprint of the seed files last applied to this database. Deploys run
-    # `seed_content --refresh`; the fingerprint stops a deploy from silently
-    # overwriting content edited in the dashboard after the last seed release.
+    # Fingerprint of the seed files last recorded for this database. Deploys run
+    # `seed_content --refresh`, which only creates missing rows; the fingerprint
+    # records the release without triggering any overwrite of dashboard content.
     seed_revision = models.CharField(max_length=64, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 

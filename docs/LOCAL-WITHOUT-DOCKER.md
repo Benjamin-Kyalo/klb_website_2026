@@ -259,5 +259,5 @@ Get-NetTCPConnection -State Listen -LocalPort 8000,5173 |
 Get-Process -Id <OwningProcess>
 ```
 
-To reset local content completely, see
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md#start-over-with-the-local-database).
+To recover local content without losing dashboard data, see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#recover-the-local-database-without-losing-dashboard-content).

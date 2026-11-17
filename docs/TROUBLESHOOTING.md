@@ -109,17 +109,38 @@ Migrations are missing:
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
-### Start over with the local database
+### Recover the local database without losing dashboard content
 
-The fastest option keeps the database and clears its data, then reseeds:
+Never use `flush` or drop the database while content matters: both erase every
+record, including pages, books and the content an editor created in the
+dashboard. Back up first (this writes to `backend\backups`, outside the public
+media directory):
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py flush --noinput
-.\.venv\Scripts\python.exe manage.py seed_content
+.\.venv\Scripts\python.exe manage.py backup
 ```
 
-`flush` deletes every record, including staff accounts. The seed recreates the
-administrator from the `SEED_ADMIN_*` values in `backend/.env`.
+Then choose one of these non-destructive repairs:
+
+```powershell
+# Create any missing seed rows. Existing rows and dashboard edits are kept.
+.\.venv\Scripts\python.exe manage.py seed_content --refresh
+
+# Restore the seed copy of seed-origin pages, sections and news in place.
+# Dashboard-created rows and sections are kept; a safety dump is written first.
+.\.venv\Scripts\python.exe manage.py seed_content --force-refresh
+```
+
+If the database schema itself is broken and a clean database is unavoidable,
+dump the current data to JSON first (never commit or expose it), then rebuild:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py dumpdata --natural-foreign --natural-primary --indent 2 --output ..\backups\manual-before-rebuild.json
+```
+
+Create a replacement database, run `migrate`, then reload the dump with
+`manage.py loaddata ..\backups\manual-before-rebuild.json`. Keep the dump until
+you have confirmed the dashboard content is back.
 
 To recreate the database itself, stop Django, then connect as the `postgres`
 superuser:
@@ -141,7 +162,8 @@ Then apply migrations and seed again:
 .\.venv\Scripts\python.exe manage.py seed_content
 ```
 
-Both options delete local data. Only do this when you are sure.
+A dropped database loses all data. Only do this after keeping the JSON dump
+above and when you are sure.
 
 ## Backend problems
 

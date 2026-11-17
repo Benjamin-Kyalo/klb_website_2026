@@ -34,7 +34,7 @@
 | `backend/apps/content/views.py` | ActiveThemeView, AdminWebsiteThemeViewSet, AdminBackupView, fixed imports |
 | `backend/apps/content/team_photos.py` | Photo parsing and injection |
 | `backend/apps/content/sanitize.py` | Allowed data-member, data-lightbox attributes |
-| `backend/apps/content/management/commands/seed_content.py` | Company name, --refresh flag, seed_digital_partners |
+| `backend/apps/content/management/commands/seed_content.py` | Company name, non-destructive --refresh / --force-refresh / --reset --confirm-reset, seed_digital_partners |
 | `backend/apps/catalogue/models.py` | search_vector field, GinIndex, full-text search in save() |
 | `backend/apps/catalogue/views.py` | Full-text search with SearchQuery/SearchRank, fallback to icontains |
 | `backend/apps/enquiries/views.py` | UnsubscribeView, fixed NewsletterView, already_subscribed tracking |
@@ -208,7 +208,8 @@ cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 
 | Django system check | ✅ 0 issues |
 | Migrations (11 total) | ✅ All applied |
 | `seed_content` | ✅ 12 pages, 128 books, 21 news, 6 partners |
-| `seed_content --refresh` | ✅ 12 pages, 21 news updated |
+| `seed_content --refresh` | ✅ Creates only missing rows (deploy-safe) |
+| `seed_content --force-refresh` | ✅ Restores seed pages/sections/news in place; dashboard content kept; safety dump written |
 | Backup command | ✅ ZIP created |
 | Full-text search | ✅ Returns ranked results |
 | Rate limiting | ✅ Configured |
@@ -298,5 +299,6 @@ cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 
  -   ` o p e n p y x l = = 3 . 1 . 5 `   ( E x c e l   e x p o r t ) 
  -   ` r e p o r t l a b = = 4 . 5 . 1 `   ( P D F   e x p o r t ) 
  
- B o t h   a r e   i n   ` b a c k e n d / r e q u i r e m e n t s . t x t ` .  
+ B o t h   a r e   i n   ` b a c k e n d / r e q u i r e m e n t s . t x t ` . 
+ 
  

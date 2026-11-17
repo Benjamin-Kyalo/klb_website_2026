@@ -148,7 +148,8 @@ python manage.py check --deploy
 
 `seed_content` is safe to rerun. On a brand-new database it creates the pages,
 128 books, news, tenders, careers, resources and the first administrator from
-the `SEED_ADMIN_*` values.
+the `SEED_ADMIN_*` values. On an existing database it creates only missing rows
+and never deletes or overwrites content saved in the dashboard.
 
 Create the media directory if it does not exist:
 

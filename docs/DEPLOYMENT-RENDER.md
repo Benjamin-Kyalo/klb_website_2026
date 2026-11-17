@@ -170,9 +170,9 @@ Optional, useful on the Free plan:
 Notes about the seed command:
 
 - `seed_content` is idempotent. It creates pages, books, news, careers, tenders, resources and the administrator account only when they are missing.
-- On later deploys it will not overwrite content that an editor has changed.
-- If you change `backend/seed/cms-seed.json` and want to push those copy changes to an already deployed database, run `python manage.py seed_content --refresh` from the Render Shell (paid plans only) or locally against the production database.
-- `--reset` deletes content tables. Never run it against a production database.
+- The Build Command runs `seed_content --refresh`, which is create-only. It never deletes or overwrites pages, sections, books, news, careers, tenders, resources, partners or settings saved in the dashboard.
+- If you change `backend/seed/cms-seed.json` and deliberately want to restore that copy over seed-origin rows in an existing database, run `python manage.py seed_content --force-refresh` from the Render Shell (paid plans only) or locally against the production database. It rewrites seed pages, sections and news in place, keeps dashboard-created rows and sections, keeps every edited setting, and writes a JSON safety dump to `BACKUP_DIR` first.
+- `--reset` alone is rejected. `--reset --confirm-reset` performs the same in-place restore; neither flag deletes content rows.
 
 ## 5. Persistent disk for uploads (production only)
 
@@ -318,7 +318,7 @@ On the Free plan there is no disk. Uploads and backups still work during a sessi
 - On the Free plan this is expected: there is no disk.
 
 **Content changes from `cms-seed.json` do not appear**
-- `seed_content` never overwrites existing rows. Use `python manage.py seed_content --refresh` to apply copy changes, or `--reset` only on a non-production database.
+- `seed_content` never overwrites existing rows. A deploy only creates missing seed rows. To restore the seed copy over seed-origin pages, sections and news, run `python manage.py seed_content --force-refresh`; dashboard-created rows and edited settings are still kept and a safety dump is written first. Never use `flush` or drop the production database to apply copy changes.
 
 **The React app shows a blank page but `/health/` works**
 - The frontend was not built. Check the build log for a Vite error and confirm `frontend/dist/index.html` exists after the build.

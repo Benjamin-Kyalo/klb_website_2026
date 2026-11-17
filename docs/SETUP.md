@@ -133,17 +133,24 @@ python manage.py migrate
 python manage.py seed_content
 ```
 
-The seed command is safe to run again: it creates missing records and leaves
-existing records alone. It never deletes administrator accounts.
+The seed command is safe to run again: it creates missing records and never
+deletes or overwrites anything an editor has saved in the dashboard. That
+includes pages, sections, books, news, careers, tenders, resources, digital
+partners and site settings.
 
-If you need to replace pages, catalogue records and site settings with the
-supplied content, run:
+If you deliberately want to restore the seed copy of pages, sections and news
+from `backend/seed/cms-seed.json`, take a backup first and run:
 
 ```powershell
-python manage.py seed_content --reset
+.\.venv\Scripts\python.exe manage.py seed_content --force-refresh
 ```
 
-`--reset` is destructive for content. It is not part of a normal deployment.
+`--force-refresh` rewrites seed-origin rows in place. It never deletes a row,
+never touches sections added in the dashboard (they have a blank `seed_key`),
+and keeps every site setting an editor has changed. A JSON safety dump is
+written to `backend\backups` before it starts. `--reset --confirm-reset` does
+the same and only exists so the intent is explicit; `--reset` alone is
+rejected.
 
 ## 6. Install the frontend
 
@@ -210,7 +217,8 @@ Run these from `backend/` with the virtual environment active:
 | `python manage.py check --deploy` | Review production security hints. |
 | `python manage.py makemigrations` | Create migrations after model changes. |
 | `python manage.py migrate` | Apply migrations. |
-| `python manage.py seed_content` | Add missing seeded content. |
+| `python manage.py seed_content` | Add missing seeded content. Never deletes dashboard content. |
+| `python manage.py seed_content --force-refresh` | Restore seed-origin pages, sections and news in place; keeps dashboard content; writes a safety dump. |
 | `python manage.py collectstatic --noinput` | Collect Django static files. |
 | `python manage.py createsuperuser` | Create another staff account. Django's built-in admin is not mounted, so use the custom dashboard or create an editor in **Users**. |
 | `python manage.py shell` | Open a Django shell. |

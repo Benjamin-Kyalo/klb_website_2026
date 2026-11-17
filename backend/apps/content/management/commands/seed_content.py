@@ -1,26 +1,35 @@
 """Seed the KLB website with verified content.
 
 Usage:
-    python manage.py seed_content                 # create anything that is missing
-    python manage.py seed_content --refresh       # apply a new seed release once
-    python manage.py seed_content --force-refresh # overwrite dashboard edits with seed copy
-    python manage.py seed_content --reset         # replace pages, catalogue and settings
+    python manage.py seed_content                        # create anything missing
+    python manage.py seed_content --refresh              # create anything missing (deploy-safe)
+    python manage.py seed_content --force-refresh        # restore the seed copy in place
+    python manage.py seed_content --reset --confirm-reset  # same, with explicit confirmation
 
-The command is safe to run more than once. It never deletes administrator
-accounts. All text comes from backend/seed/*.json.
+Nothing entered in the dashboard is ever deleted or overwritten. Every flag
+creates missing rows only, except the explicit restore modes
+(``--force-refresh`` and ``--reset --confirm-reset``), which rewrite seed-origin
+pages, sections and news in place. Sections added in the dashboard carry a
+blank ``seed_key`` and are never touched. Other dashboard-created rows (news,
+careers, tenders, resources, partners, books) are never deleted. Site settings
+are only filled where they are blank; an existing value is always kept.
 
-`--refresh` is deliberately gated by a fingerprint of the seed files: a deploy
-applies the seed copy once per seed release and afterwards keeps content edited
-in the dashboard. Use `--force-refresh` to deliberately restore the seed copy.
+Restore modes write a JSON safety dump to ``settings.BACKUP_ROOT`` first.
+All text comes from backend/seed/*.json; administrator accounts are never
+deleted.
 """
 import hashlib
 import json
 import os
+from datetime import datetime
 from decimal import Decimal
+from io import StringIO
 from pathlib import Path
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management import call_command
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.utils.text import slugify
 
 from apps.accounts.models import User
@@ -158,8 +167,9 @@ SEED_FILES = ("cms-seed.json", "books.json")
 def seed_fingerprint():
     """Return a short fingerprint of every seed file.
 
-    The value changes only when the seed content itself changes, so a deploy
-    can refresh stale rows once without overwriting later dashboard edits.
+    The value changes only when the seed content itself changes. It marks which
+    release has been recorded; it never triggers an overwrite of dashboard
+    content in a deploy.
     """
     digest = hashlib.sha256()
     for name in SEED_FILES:
@@ -182,56 +192,76 @@ class Command(BaseCommand):
     help = "Load the verified KLB pages, catalogue, news and settings into PostgreSQL."
 
     def add_arguments(self, parser):
-        parser.add_argument("--reset", action="store_true", help="Delete existing content before seeding.")
+        parser.add_argument(
+            "--reset",
+            action="store_true",
+            help="Restore the seed copy in place. Requires --confirm-reset. Never deletes rows.",
+        )
+        parser.add_argument(
+            "--confirm-reset",
+            action="store_true",
+            help="Confirm that --reset may rewrite seed pages, sections and news.",
+        )
         parser.add_argument(
             "--refresh",
             action="store_true",
-            help="Apply the seed copy when the seed release is newer than the database.",
+            help="Create missing seed content. Never overwrites dashboard edits.",
         )
         parser.add_argument(
             "--force-refresh",
             action="store_true",
-            help="Overwrite pages, sections, news and settings with the seed copy, even if already applied.",
+            help=(
+                "Restore seed pages, sections and news in place. Dashboard-created "
+                "rows and sections are kept."
+            ),
         )
         parser.add_argument("--admin-email", default=os.getenv("SEED_ADMIN_EMAIL", "admin@klb.co.ke"))
         parser.add_argument("--admin-password", default=os.getenv("SEED_ADMIN_PASSWORD", "ChangeMe-2026!"))
 
     def handle(self, *args, **options):
-        if options["reset"]:
-            self.stdout.write("Resetting content tables...")
-            Section.objects.all().delete()
-            Page.objects.all().delete()
-            Book.objects.all().delete()
-            News.objects.all().delete()
-            Career.objects.all().delete()
-            Tender.objects.all().delete()
-            Resource.objects.all().delete()
-            SiteSetting.objects.all().delete()
+        reset = options["reset"]
+        force = options["force_refresh"]
+        if reset and not options["confirm_reset"]:
+            raise CommandError(
+                "--reset rewrites seed pages, sections and news in place. "
+                "Nothing is deleted, but a JSON safety dump is written first. "
+                "Re-run with --confirm-reset to continue."
+            )
+        if reset and (options["refresh"] or force):
+            raise CommandError("Choose either --reset or --refresh/--force-refresh, not both.")
 
+        restore = reset or force
         revision = seed_fingerprint()
         applied = SiteSetting.objects.filter(pk=1).values_list("seed_revision", flat=True).first() or ""
-        force = options["force_refresh"]
-        refresh = bool(options["reset"] or force or (options["refresh"] and applied != revision))
-        self._refresh = refresh
+        refresh_due = bool(options["refresh"] and applied != revision)
+        self._refresh = bool(refresh_due or restore)
 
-        if refresh:
-            self.stdout.write(f"Applying seed revision {revision}.")
+        if restore:
+            self._safety_dump()
+            self.stdout.write(
+                f"Restoring seed revision {revision} in place (no dashboard rows will be deleted)."
+            )
+        elif refresh_due:
+            self.stdout.write(
+                f"Seed revision {revision} is new; creating missing seed content only."
+            )
         elif options["refresh"]:
             self.stdout.write("Seed revision already applied; keeping dashboard edits.")
 
-        settings_obj = self.seed_settings()
-        pages = self.seed_pages(refresh)
-        books = self.seed_books()
-        news = self.seed_news(refresh)
-        careers = self.seed_careers()
-        tenders = self.seed_tenders()
-        resources = self.seed_resources()
-        digital_partners = self.seed_digital_partners()
-        self.seed_admin(options["admin_email"], options["admin_password"])
+        with transaction.atomic():
+            settings_obj = self.seed_settings()
+            pages = self.seed_pages(restore=restore)
+            books = self.seed_books()
+            news = self.seed_news(restore=restore)
+            careers = self.seed_careers()
+            tenders = self.seed_tenders()
+            resources = self.seed_resources()
+            digital_partners = self.seed_digital_partners()
+            self.seed_admin(options["admin_email"], options["admin_password"])
 
-        if refresh and settings_obj.seed_revision != revision:
-            settings_obj.seed_revision = revision
-            settings_obj.save(update_fields=["seed_revision"])
+            if self._refresh and settings_obj.seed_revision != revision:
+                settings_obj.seed_revision = revision
+                settings_obj.save(update_fields=["seed_revision"])
 
         self.stdout.write(self.style.SUCCESS("Seed complete:"))
         self.stdout.write(
@@ -244,6 +274,47 @@ class Command(BaseCommand):
             f"  resources: {resources}\n"
             f"  digital partners: {digital_partners}"
         )
+
+    # ------------------------------------------------------------------
+    def _safety_dump(self):
+        """Write a JSON dump before a restore mode changes any seed rows.
+
+        The dump goes to ``settings.BACKUP_ROOT`` (never ``MEDIA_ROOT``) so it
+        cannot be exposed as a public upload. A fresh database has nothing to
+        protect, so the dump is skipped there.
+        """
+        if not (
+            Page.objects.exists()
+            or Section.objects.exists()
+            or News.objects.exists()
+            or SiteSetting.objects.exists()
+            or Book.objects.exists()
+        ):
+            self.stdout.write("Fresh database; no safety dump needed.")
+            return
+
+        backup_root = Path(settings.BACKUP_ROOT)
+        backup_root.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = backup_root / f"klb_preseed_{stamp}.json"
+        counter = 2
+        while path.exists():
+            path = backup_root / f"klb_preseed_{stamp}_{counter}.json"
+            counter += 1
+
+        buffer = StringIO()
+        call_command(
+            "dumpdata",
+            "--natural-foreign",
+            "--natural-primary",
+            stdout=buffer,
+            verbosity=0,
+        )
+        payload = buffer.getvalue()
+        if not payload.strip():
+            raise CommandError("Safety dump failed: dumpdata produced an empty file.")
+        path.write_text(payload, encoding="utf-8")
+        self.stdout.write(self.style.WARNING(f"Safety backup written to {path}"))
 
     # ------------------------------------------------------------------
     def seed_settings(self):
@@ -280,50 +351,90 @@ class Command(BaseCommand):
         obj, created = SiteSetting.objects.get_or_create(pk=1, defaults=defaults)
         if created:
             self.stdout.write("Created site settings.")
-        elif getattr(self, "_refresh", False):
-            obj.statistics = defaults["statistics"]
-            obj.navigation = defaults["navigation"]
-            obj.footer_columns = defaults["footer_columns"]
-            obj.seo_default_description = defaults["seo_default_description"]
-            obj.save(update_fields=["statistics", "navigation", "footer_columns", "seo_default_description"])
-            self.stdout.write("Refreshed site settings.")
+            return obj
+
+        # Existing settings belong to the dashboard. Fill only values that are
+        # still blank so new seed fields can appear without replacing any value
+        # an editor has saved.
+        filled = []
+        for field, value in defaults.items():
+            current = getattr(obj, field)
+            if field in ("navigation", "footer_columns", "statistics"):
+                is_blank = not current
+            else:
+                is_blank = current is None or current == ""
+            if is_blank:
+                setattr(obj, field, value)
+                filled.append(field)
+        if filled:
+            obj.save(update_fields=filled)
+            self.stdout.write(f"Filled blank site settings: {', '.join(filled)}")
         return obj
 
-    def seed_pages(self, refresh=False):
+    def seed_pages(self, restore=False):
         data = load_json("cms-seed.json")
         count = 0
         for index, page_data in enumerate(data["pages"]):
-            page, created = Page.objects.get_or_create(
-                slug=page_data["slug"],
-                defaults={
-                    "title": page_data["title"],
-                    "meta_title": page_data.get("metaTitle", ""),
-                    "meta_description": page_data.get("metaDescription", ""),
-                    "template": page_data.get("template", "page"),
-                    "status": page_data.get("status", "published"),
-                    "sort_order": index,
-                },
-            )
-            if created or refresh:
-                if not created:
-                    page.title = page_data["title"]
-                    page.meta_title = page_data.get("metaTitle", "")
-                    page.meta_description = page_data.get("metaDescription", "")
-                    page.template = page_data.get("template", "page")
-                    page.sort_order = index
-                    page.save()
-                    page.sections.all().delete()
-                for section_index, section_data in enumerate(page_data.get("sections", [])):
-                    Section.objects.create(
-                        page=page,
-                        label=section_data.get("label", "Section"),
-                        kind=section_data.get("kind", "html"),
-                        html=section_data.get("html", ""),
-                        settings=section_data.get("settings") or {},
-                        sort_order=section_index,
-                    )
+            defaults = {
+                "title": page_data["title"],
+                "meta_title": page_data.get("metaTitle", ""),
+                "meta_description": page_data.get("metaDescription", ""),
+                "template": page_data.get("template", "page"),
+                "status": page_data.get("status", "published"),
+                "sort_order": index,
+            }
+            page, created = Page.objects.get_or_create(slug=page_data["slug"], defaults=defaults)
+            if created:
                 count += 1
+            elif restore:
+                changed = False
+                for field, value in defaults.items():
+                    if getattr(page, field) != value:
+                        setattr(page, field, value)
+                        changed = True
+                if changed:
+                    page.save()
+                    count += 1
+            self._seed_page_sections(page, page_data.get("sections", []), restore=restore)
         return count
+
+    def _seed_page_sections(self, page, sections, restore=False):
+        """Create missing seed sections and (only when restoring) refresh them.
+
+        A section is seed-origin when its ``seed_key`` matches the seed label.
+        Sections created by older releases have no ``seed_key`` yet, so a
+        section whose label appears in the seed file is adopted. Dashboard
+        sections have a different label or stay blank-keyed and are never
+        updated or deleted.
+        """
+        for section_index, section_data in enumerate(sections):
+            label = section_data.get("label", "Section")
+            seed_key = (slugify(label) or "section")[:100]
+            existing = page.sections.filter(seed_key=seed_key).first()
+            if existing is None:
+                existing = page.sections.filter(seed_key="", label=label).first()
+                if existing is not None:
+                    existing.seed_key = seed_key
+                    existing.save(update_fields=["seed_key"])
+
+            values = {
+                "label": label,
+                "kind": section_data.get("kind", "html"),
+                "html": section_data.get("html", ""),
+                "settings": section_data.get("settings") or {},
+                "sort_order": section_index,
+            }
+            if existing is None:
+                Section.objects.create(page=page, seed_key=seed_key, **values)
+            elif restore:
+                changed = False
+                for field, value in values.items():
+                    if getattr(existing, field) != value:
+                        setattr(existing, field, value)
+                        changed = True
+                if changed:
+                    existing.save()
+
 
     def seed_books(self):
         data = load_json("books.json")
@@ -354,33 +465,31 @@ class Command(BaseCommand):
                 count += 1
         return count
 
-    def seed_news(self, refresh=False):
+    def seed_news(self, restore=False):
         data = load_json("cms-seed.json")
         count = 0
         for item in data["news"]:
             slug = item.get("slug") or slugify(item["title"])[:240]
-            article, created = News.objects.get_or_create(
-                slug=slug,
-                defaults={
-                    "title": item["title"],
-                    "category": item.get("category", ""),
-                    "summary": item.get("summary", ""),
-                    "body_html": item.get("bodyHtml", ""),
-                    "published_at": item["publishedAt"],
-                    "featured": bool(item.get("featured")),
-                },
-            )
+            values = {
+                "title": item["title"],
+                "category": item.get("category", ""),
+                "summary": item.get("summary", ""),
+                "body_html": item.get("bodyHtml", ""),
+                "published_at": item["publishedAt"],
+                "featured": bool(item.get("featured")),
+            }
+            article, created = News.objects.get_or_create(slug=slug, defaults=values)
             if created:
                 count += 1
-            elif refresh:
-                article.title = item["title"]
-                article.category = item.get("category", "")
-                article.summary = item.get("summary", "")
-                article.body_html = item.get("bodyHtml", "")
-                article.published_at = item["publishedAt"]
-                article.featured = bool(item.get("featured"))
-                article.save()
-                count += 1
+            elif restore:
+                changed = False
+                for field, value in values.items():
+                    if getattr(article, field) != value:
+                        setattr(article, field, value)
+                        changed = True
+                if changed:
+                    article.save()
+                    count += 1
         return count
 
     def seed_careers(self):

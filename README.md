@@ -150,9 +150,13 @@ klb-platform/
 ## Seeded content
 
 `python manage.py seed_content` reads `backend/seed/cms-seed.json` and
-`backend/seed/books.json`. It creates missing records and leaves existing ones
-alone; use `--reset` only when you intentionally want to replace pages, the
-catalogue and site settings. The command never deletes administrator accounts.
+`backend/seed/books.json`. It creates missing records and never deletes or
+overwrites content saved in the dashboard. `--refresh` is the deploy-safe flag
+and is also create-only. Use `--force-refresh` only when you deliberately want
+to restore the seed copy of seed-origin pages, sections and news; it keeps
+dashboard-created rows and edited settings and writes a safety dump first.
+`--reset` is rejected unless `--confirm-reset` is added and never truncates
+tables. The command never deletes administrator accounts.
 
 The seed contains 12 pages, 128 book records, 21 news items, 1 vacancy, 9 tenders
 and 19 resources. All copy, prices and contact details come from the supplied
