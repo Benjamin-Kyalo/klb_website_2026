@@ -24,8 +24,8 @@ live Render deployment) - not inferred from reading code.
 | Frontend production build | Success (~3.4 s), `dist/` generated |
 | Public browser journeys | All routes, catalogue, forms, newsletter, 404, PDFs verified |
 | Admin browser journeys | Every module's create / edit / delete exercised in the UI |
-| Production (Render) | Hero content and counters now current; theme endpoint live |
-| Remaining blockers | Real SMTP credentials, push/deploy of this commit (see section 11) |
+| Production (Render) | Commit `e51995d` deployed: current content, hero final values `1,000+ / 250+ / 1947`, active theme class applied, 0 console errors |
+| Remaining blockers | Real SMTP credentials, live UI backup restore (see section 11) |
 
 Two defects were found *because* this round executed the app rather than reading it:
 
@@ -145,7 +145,7 @@ security boundaries.
 | Home page render | Hero, navigation, footer, newsletter | All render; no console errors | PASS | None |
 | Hero counters - attributes | `data-count`, `data-suffix`, `data-final` survive CMS sanitising | Present in `/api/pages/home/` HTML | FIXED | Sanitizer allow-list |
 | Hero counters - local animation | Numbers animate to final values | Sampled 50 ms: 180+ -> ... -> 1,000+ / 250+ / 1947 | FIXED | `animateCounts.js` + reduced-motion + fallback |
-| Hero counters - production | Final values displayed | `1,000+`, `250+`, `1947`; `updated_at` 2026-11-16T11:15:09+03:00; site name includes PLC | FIXED | Render Build Command runs `seed_content --refresh` |
+| Hero counters - production | Final values displayed | `1,000+`, `250+`, `1947`; `updated_at` 2026-11-17T08:45; site name includes PLC | FIXED | Render Build Command runs `seed_content --refresh`; verified after deploy `e51995d` |
 | Local vs Render content parity | Same content from same seed | Production was stale (Nov 12, no `data-count`); now current | FIXED | Seed runs at build time; revision gate prevents overwrites |
 | Catalogue list | Paginated cards | 128 titles; 24 per page; "Show more" works | PASS | None |
 | Catalogue search | Filtered, case-insensitive | `Mathematics` -> 9 results | PASS | None |
@@ -252,23 +252,28 @@ confirm `400` + `{"detail": "...", "errors": {...}}`.
 
 ## 9. Production (Render) verification
 
-Verified against `https://klb-website.onrender.com` after the Render Build Command was
-corrected to run the seed:
+Commit `e51995d` was pushed to `main`; Render built and deployed it automatically. Verified
+against `https://klb-website.onrender.com` after the deploy:
 
 | Check | Observed |
 |---|---|
 | `/health/` | 200, `{"status":"ok"}` |
-| `/api/pages/home/` | `updated_at = 2026-11-16T11:15:09.653870+03:00`, contains `data-count` |
+| `/api/pages/home/` | `updated_at = 2026-11-17T08:45:21.745034+03:00`, 8 sections, contains `data-count` |
 | `/api/site/` | `site_name = "Kenya Literature Bureau PLC"` |
-| `/api/themes/active/` | 200 (endpoint deployed) |
+| `/api/themes/active/` | 200; active theme `theme-christmas` (`2026-11-13` to `2026-11-25`) |
+| Seasonal theme in the DOM | `<body class="theme-christmas">` after the load |
 | Hero counters | 3 elements; final text `1,000+`, `250+`, `1947` |
-| Static JS | `assets/index-*.js` contains `data-count`, `data-final`, `prefers-reduced-motion` |
+| Served bundle | `/assets/index-DlE9K2Cy.js` contains `/themes/active/` (theme fix deployed) |
+| CSP | includes `font-src ... code.tidio.co`, `media-src ... code.tidio.co`, `frame-src ... code.tidio.co` |
+| Browser console | **0 errors**; the previous Tidio CSP font/media errors are gone |
+| Price list PDF | `/assets/docs/klb-price-list-2026.pdf` -> `200`, `application/pdf`, 32,835,061 bytes |
 
 **Note on the counter animation in automated production tabs:** in the remote inspection
 tab, `requestAnimationFrame` did not fire at all (0 frames in 2.5 s), so the numbers jumped
 from `0` to the final values at ~2.3 s via the `setTimeout` safety net. A local foreground
 tab animated with intermediate values as designed. This is Chromium background/remote-tab
-throttling, not a site defect; the final values are always rendered.
+throttling, not a site defect; the final values are always rendered, and the live production
+page displays them correctly.
 
 ---
 
@@ -343,11 +348,13 @@ DEFAULT_FROM_EMAIL=<verified sender address>
 
 Then use **Admin -> Settings -> Send test email** and confirm the message arrives.
 
-### 11.2 Deploying these newest fixes - BLOCKED (deploy access)
+### 11.2 Deploying these newest fixes - DONE
 
-The fixes in section 10 (seed gate, theme application, badges, CSP) are committed locally
-but not yet pushed. Pushing to the connected branch or clicking **Manual Deploy** is
-required. Post-deploy checks are in 12.8.
+Commit `e51995d` was pushed to `origin/main` and Render's automatic deploy picked it up.
+The production checks in section 9 confirm the backend and frontend fixes are live (new
+bundle `index-DlE9K2Cy.js`, theme class applied, new CSP, price-list PDF). If automatic
+deploys are ever disabled, use **Manual Deploy -> Clear build cache & deploy** with the
+Build Command in 12.7.
 
 ### 11.3 Live UI backup restore - not executed in the browser
 
