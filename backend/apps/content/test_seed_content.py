@@ -1,9 +1,10 @@
 """Tests for the non-destructive seed_content command.
 
 The production deploy runs ``seed_content --refresh`` on every build. These
-tests prove that every seed path keeps content created or edited in the
-dashboard, that restore modes are explicit, and that a safety dump is written
-before any seed row is rewritten.
+tests prove that the deploy path keeps content created or edited in the
+dashboard, that restore modes keep dashboard-created rows/sections/settings,
+that restore modes are explicit, and that a safety dump is written before any
+seed row is rewritten.
 """
 import json
 import tempfile

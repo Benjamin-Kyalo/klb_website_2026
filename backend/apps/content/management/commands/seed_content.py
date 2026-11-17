@@ -6,13 +6,14 @@ Usage:
     python manage.py seed_content --force-refresh        # restore the seed copy in place
     python manage.py seed_content --reset --confirm-reset  # same, with explicit confirmation
 
-Nothing entered in the dashboard is ever deleted or overwritten. Every flag
-creates missing rows only, except the explicit restore modes
-(``--force-refresh`` and ``--reset --confirm-reset``), which rewrite seed-origin
-pages, sections and news in place. Sections added in the dashboard carry a
-blank ``seed_key`` and are never touched. Other dashboard-created rows (news,
-careers, tenders, resources, partners, books) are never deleted. Site settings
-are only filled where they are blank; an existing value is always kept.
+Dashboard-created rows and sections are never deleted. Plain seeding and
+``--refresh`` never overwrite anything; they only create missing rows. The
+explicit restore modes (``--force-refresh`` and ``--reset --confirm-reset``)
+rewrite seed-origin pages, sections and news in place, but still never delete a
+row. Sections added in the dashboard carry a blank ``seed_key`` and are never
+touched. Other dashboard-created rows (news, careers, tenders, resources,
+partners, books) are never deleted. Site settings are only filled where they
+are blank; an existing value is always kept.
 
 Restore modes write a JSON safety dump to ``settings.BACKUP_ROOT`` first.
 All text comes from backend/seed/*.json; administrator accounts are never

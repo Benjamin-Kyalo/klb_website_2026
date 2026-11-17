@@ -390,7 +390,7 @@ Executed evidence (`.\.venv\Scripts\python.exe manage.py test apps.content.test_
 
 ```
 Found 12 test(s).
-Ran 12 tests in 6.366s
+Ran 12 tests in 5.796s
 OK
 ```
 

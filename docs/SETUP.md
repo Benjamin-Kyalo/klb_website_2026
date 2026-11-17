@@ -133,10 +133,10 @@ python manage.py migrate
 python manage.py seed_content
 ```
 
-The seed command is safe to run again: it creates missing records and never
-deletes or overwrites anything an editor has saved in the dashboard. That
-includes pages, sections, books, news, careers, tenders, resources, digital
-partners and site settings.
+The seed command is safe to run again: plain seeding and `--refresh` only
+create missing records and never delete or overwrite anything an editor has
+saved in the dashboard. That includes pages, sections, books, news, careers,
+tenders, resources, digital partners and site settings.
 
 If you deliberately want to restore the seed copy of pages, sections and news
 from `backend/seed/cms-seed.json`, take a backup first and run:
