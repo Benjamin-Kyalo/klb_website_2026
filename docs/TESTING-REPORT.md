@@ -1,9 +1,9 @@
 # KLB PLC Website - Functional Testing Report
 
-**Project:** Kenya Literature Bureau PLC website (public site + admin dashboard)
-**Report date:** 17 November 2026
-**Working directory:** `C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026`
-**Stack:** React 18 + Vite 6 / Django 5 + DRF / PostgreSQL (local `klb_verify`, production Supabase)
+**Project:** Kenya Literature Bureau PLC website (public site + admin dashboard)  
+**Report date:** 17 November 2026  
+**Working directory:** `C:\Users\Admin IT\Downloads\CS50\CS50_codes\klb_website_2026`  
+**Stack:** React 18 + Vite 6 / Django 5 + DRF / PostgreSQL (local `klb_verify`, production Supabase)  
 **Branding:** `#F3E5AB` yellow, Century Gothic, KLB identity preserved.
 
 ---
