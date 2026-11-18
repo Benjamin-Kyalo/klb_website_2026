@@ -26,6 +26,7 @@ export default function CataloguePage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [moreError, setMoreError] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchText, setSearchText] = useState(searchParams.get("q") || "");
 
@@ -54,6 +55,7 @@ export default function CataloguePage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setMoreError(null);
     setBooks([]);
     setCount(0);
     setNextUrl(null);
@@ -88,11 +90,11 @@ export default function CataloguePage() {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
     else next.delete(key);
-    setSearchParams(next, { replace: true });
+    setSearchParams(next);
   }
 
   function clearAll() {
-    setSearchParams({}, { replace: true });
+    setSearchParams({});
     setFiltersOpen(false);
   }
 
@@ -104,6 +106,7 @@ export default function CataloguePage() {
   async function loadMore() {
     if (!nextUrl || loadingMore) return;
     setLoadingMore(true);
+    setMoreError(null);
     try {
       const url = new URL(nextUrl);
       const params = Object.fromEntries(url.searchParams.entries());
@@ -111,7 +114,8 @@ export default function CataloguePage() {
       setBooks((current) => [...current, ...(pageData.results || [])]);
       setNextUrl(pageData.next);
     } catch (err) {
-      setError(err);
+      // Keep the titles already on screen; only the extra page failed.
+      setMoreError(err);
     } finally {
       setLoadingMore(false);
     }
@@ -247,8 +251,14 @@ export default function CataloguePage() {
         <div>
           <div className="catalogue-toolbar">
             <p className="result-count">
-              <strong>{count}</strong> {count === 1 ? "title" : "titles"}{" "}
-              {activeFilters.length ? <span>matching your filters</span> : null}
+              {loading ? (
+                <span>Loading titles…</span>
+              ) : (
+                <>
+                  <strong>{count}</strong> {count === 1 ? "title" : "titles"}{" "}
+                  {activeFilters.length ? <span>matching your filters</span> : null}
+                </>
+              )}
             </p>
             <div className="catalogue-toolbar__actions">
               <button className="btn btn--secondary btn--sm filters-open" type="button" onClick={() => setFiltersOpen(true)}>
@@ -300,16 +310,24 @@ export default function CataloguePage() {
             <>
               <div className="book-grid catalogue-grid">
                 {books.map((book, index) => (
-                  <BookCard book={book} eager={index < 8} key={book.id} />
+                  <BookCard book={book} eager={index < 8} hideFeatured key={book.id} />
                 ))}
               </div>
-              {nextUrl ? (
+              {moreError ? (
+                <p className="catalogue-end muted-meta" role="alert">
+                  More titles could not be loaded. The {pluralise(books.length, "title")} above are still available.{" "}
+                  <button className="link-button" type="button" onClick={loadMore}>
+                    Try again
+                  </button>
+                </p>
+              ) : null}
+              {nextUrl && !moreError ? (
                 <div className="load-more">
                   <button className="btn btn--secondary" type="button" onClick={loadMore} disabled={loadingMore}>
                     {loadingMore ? "Loading…" : "Show more titles"}
                   </button>
                 </div>
-              ) : (
+              ) : nextUrl ? null : (
                 <p className="catalogue-end muted-meta">
                   Showing all {pluralise(count, "title")} for this search.
                 </p>
@@ -340,18 +358,30 @@ export default function CataloguePage() {
   );
 }
 
+const ALL_LABELS = {
+  Collection: "All collections",
+  Level: "All levels",
+  Subject: "All subjects",
+};
+
 function FilterGroup({ title, field, values, selected, labels = {}, onChange, collapsed = false }) {
   if (!values || !values.length) return null;
+  const groupName = `catalogue-filter-${field}`;
   return (
     <details className="filter-group" open={!collapsed}>
       <summary>{title}</summary>
       <div className="filter-options">
+        <label className="check">
+          <input type="radio" name={groupName} checked={!selected} onChange={() => onChange(field, "")} />
+          <span>{ALL_LABELS[title] || `All ${title.toLowerCase()}`}</span>
+        </label>
         {values.map((value) => (
           <label className="check" key={value}>
             <input
-              type="checkbox"
+              type="radio"
+              name={groupName}
               checked={selected === value}
-              onChange={() => onChange(field, selected === value ? "" : value)}
+              onChange={() => onChange(field, value)}
             />
             <span>{labels[value] || value}</span>
           </label>

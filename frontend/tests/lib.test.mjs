@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  absoluteUrl,
   formatDate,
   formatDateTime,
   money,
@@ -54,6 +55,19 @@ test("safeImagePath keeps absolute URLs and normalises relative paths", () => {
   assert.equal(safeImagePath("https://example.com/a.png"), "https://example.com/a.png");
   assert.equal(safeImagePath("/media/a.png"), "/media/a.png");
   assert.equal(safeImagePath("media/a.png"), "/media/a.png");
+});
+
+test("absoluteUrl qualifies relative paths without duplicating absolute URLs", () => {
+  const base = "https://klb.co.ke";
+  assert.equal(absoluteUrl("/assets/og-klb.jpg", base), "https://klb.co.ke/assets/og-klb.jpg");
+  assert.equal(absoluteUrl("assets/og-klb.jpg", base), "https://klb.co.ke/assets/og-klb.jpg");
+  assert.equal(absoluteUrl("/assets/a.jpg", "https://klb.co.ke/"), "https://klb.co.ke/assets/a.jpg");
+  assert.equal(
+    absoluteUrl("https://cdn.example.com/cover.webp", base),
+    "https://cdn.example.com/cover.webp",
+  );
+  assert.equal(absoluteUrl("//cdn.example.com/cover.webp", base), "//cdn.example.com/cover.webp");
+  assert.equal(absoluteUrl("", base), "");
 });
 
 test("editor defaults cannot see system modules or delete content", () => {

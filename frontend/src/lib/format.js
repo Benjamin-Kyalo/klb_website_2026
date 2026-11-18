@@ -39,6 +39,25 @@ export function safeImagePath(path) {
   return `/${path}`;
 }
 
+const ABSOLUTE_URL = /^(?:[a-z][a-z0-9+.-]*:)?\/\//i;
+
+/**
+ * Turns a site-relative path into a fully qualified URL.
+ *
+ * Social images and JSON-LD require absolute URLs, but dashboard content can
+ * legitimately store either `/assets/cover.webp` or a full `https://` URL.
+ * Absolute URLs (including protocol-relative ones) are returned untouched so
+ * they are never concatenated onto the site origin.
+ */
+export function absoluteUrl(path, base = "") {
+  if (!path) return "";
+  const value = String(path);
+  if (ABSOLUTE_URL.test(value) || value.startsWith("data:")) return value;
+  const origin = String(base || "").replace(/\/+$/, "");
+  const suffix = value.startsWith("/") ? value : `/${value}`;
+  return origin ? `${origin}${suffix}` : suffix;
+}
+
 export const COLLECTION_LABELS = {
   CBE: "CBE",
   Secondary: "Secondary",

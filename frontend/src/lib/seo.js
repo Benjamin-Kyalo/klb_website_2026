@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { absoluteUrl } from "./format.js";
+
 const SITE_URL = (import.meta.env.VITE_SITE_URL || "https://klb.co.ke").replace(/\/$/, "");
 
 function setMeta(selector, attrs) {
@@ -28,7 +30,8 @@ export default function Seo({
 }) {
   useEffect(() => {
     const fullTitle = title || "Kenya Literature Bureau PLC";
-    const url = `${SITE_URL}${path}`;
+    const url = absoluteUrl(path, SITE_URL);
+    const shareImage = absoluteUrl(image, SITE_URL);
     document.title = fullTitle;
 
     if (description) {
@@ -40,8 +43,8 @@ export default function Seo({
     setMeta('meta[name="twitter:title"]', { name: "twitter:title", content: fullTitle });
     setMeta('meta[property="og:url"]', { property: "og:url", content: url });
     setMeta('meta[property="og:type"]', { property: "og:type", content: type });
-    setMeta('meta[property="og:image"]', { property: "og:image", content: image });
-    setMeta('meta[name="twitter:image"]', { name: "twitter:image", content: image });
+    setMeta('meta[property="og:image"]', { property: "og:image", content: shareImage });
+    setMeta('meta[name="twitter:image"]', { name: "twitter:image", content: shareImage });
     setMeta('link[rel="canonical"]', { rel: "canonical", href: url });
     setMeta('meta[name="robots"]', {
       name: "robots",

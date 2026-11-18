@@ -198,6 +198,8 @@ table.admin-table { width: 100%; border-collapse: collapse; font-size: .845rem; 
 .admin-table tr:last-child td { border-bottom: 0; }
 .admin-table tbody tr { transition: background-color .12s var(--ease); }
 .admin-table tbody tr:hover { background: #fafcfc; }
+.admin-table tbody tr[role="button"] { cursor: pointer; }
+.admin-table tbody tr[role="button"]:focus-visible { outline: 3px solid var(--blue-deep); outline-offset: -2px; }
 .admin-table td .btn { margin-right: .25rem; }
 .admin-table__title { font-weight: 650; color: var(--blue-ink); }
 .admin-table--compact th, .admin-table--compact td { padding: .45rem .55rem; }

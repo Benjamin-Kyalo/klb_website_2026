@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { money, safeImagePath } from "../lib/format.js";
 
-export default function BookCard({ book, eager = false, badge = "" }) {
-  const label = badge || (book.new_arrival ? "New" : book.featured ? "Featured" : "");
+export default function BookCard({ book, eager = false, badge = "", hideFeatured = false }) {
+  const label = badge || (book.new_arrival ? "New" : book.featured && !hideFeatured ? "Featured" : "");
   return (
     <article className="book-card">
       <Link className="book-card__link" to={`/books/${book.slug}/`}>

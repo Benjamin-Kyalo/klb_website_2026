@@ -2659,6 +2659,21 @@ a.filter-chip:hover {
   font-size: 0.62rem;
 }
 
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--blue-deep);
+}
+
 .filters-open {
   display: none;
 }
@@ -2799,6 +2814,21 @@ a.filter-chip:hover {
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-top: 1.2rem;
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+
+.share-actions__status {
+  flex-basis: 100%;
+  min-height: 1.1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .meta-list {

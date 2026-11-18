@@ -444,11 +444,11 @@
         {
           "label": "Page hero",
           "kind": "html",
-          "html": "<section class=\"page-hero\">\n  <div class=\"container\">\n    <nav class=\"breadcrumbs\" aria-label=\"Breadcrumb\"><a href=\"/\">Home</a><span aria-hidden=\"true\">/</span><span aria-current=\"page\">News &amp; media</span></nav>\n    <div class=\"page-hero__inner\">\n      <div>\n        <p class=\"kicker\">News &amp;amp; media</p>\n        <h1>From the Bureau.</h1>\n        <p>Announcements, partnerships, launches and institutional news from Kenya Literature Bureau PLC.</p>\n      </div>\n      <div class=\"page-hero__aside\"><strong>Media enquiries</strong><br>Corporate Communications<br><a href=\"mailto:info@klb.co.ke\">info@klb.co.ke</a></div>\n    </div>\n  </div>\n</section>",
+          "html": "<section class=\"page-hero\">\n  <div class=\"container\">\n    <nav class=\"breadcrumbs\" aria-label=\"Breadcrumb\"><a href=\"/\">Home</a><span aria-hidden=\"true\">/</span><span aria-current=\"page\">News &amp; media</span></nav>\n    <div class=\"page-hero__inner\">\n      <div>\n        <p class=\"kicker\">News &amp; media</p>\n        <h1>From the Bureau.</h1>\n        <p>Announcements, partnerships, launches and institutional news from Kenya Literature Bureau PLC.</p>\n      </div>\n      <div class=\"page-hero__aside\"><strong>Media enquiries</strong><br>Corporate Communications<br><a href=\"mailto:info@klb.co.ke\">info@klb.co.ke</a></div>\n    </div>\n  </div>\n</section>",
           "settings": {
             "sectionClass": "page-hero",
             "sectionId": "",
-            "kicker": "News &amp; media",
+            "kicker": "News & media",
             "heading": "From the Bureau.",
             "lede": ""
           }

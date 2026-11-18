@@ -156,7 +156,7 @@ export default function AccessibilityMenu() {
     window.speechSynthesis.cancel();
     const source =
       document.querySelector("main") || document.querySelector("[role='main']") || document.body;
-    const text = (source?.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 6000);
+    const text = (source?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 6000);
     if (!text) {
       setMessage("There is no readable text on this page.");
       return;

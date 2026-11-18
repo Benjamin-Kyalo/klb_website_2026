@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getNewsItem } from "../lib/api.js";
-import { formatDate, safeImagePath } from "../lib/format.js";
+import { formatDate, absoluteUrl, safeImagePath } from "../lib/format.js";
 import Seo, { SITE_URL } from "../lib/seo.js";
 import { useSite } from "../context/SiteContext.jsx";
 import Loading, { ErrorState } from "../components/Loading.jsx";
+import ShareActions from "../components/ShareActions.jsx";
 
 export default function NewsDetailPage() {
   const { slug } = useParams();
@@ -61,6 +62,7 @@ export default function NewsDetailPage() {
   }
 
   const description = article.summary || article.title;
+  const heroImage = article.image ? safeImagePath(article.image) : "";
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -69,7 +71,7 @@ export default function NewsDetailPage() {
     dateModified: article.updated_at,
     description,
     articleSection: article.category || undefined,
-    image: article.image ? `${SITE_URL}${safeImagePath(article.image)}` : `${SITE_URL}/assets/og-klb.jpg`,
+    image: absoluteUrl(heroImage || "/assets/og-klb.jpg", SITE_URL),
     author: { "@type": "Organization", name: "Kenya Literature Bureau PLC" },
     publisher: { "@type": "Organization", name: "Kenya Literature Bureau PLC" },
     mainEntityOfPage: `${SITE_URL}/news/${article.slug}/`,
@@ -77,7 +79,14 @@ export default function NewsDetailPage() {
 
   return (
     <>
-      <Seo title={`${article.title} | Kenya Literature Bureau PLC`} description={description} path={`/news/${article.slug}/`} type="article" jsonLd={jsonLd} />
+      <Seo
+        title={`${article.title} | Kenya Literature Bureau PLC`}
+        description={description}
+        path={`/news/${article.slug}/`}
+        image={heroImage || undefined}
+        type="article"
+        jsonLd={jsonLd}
+      />
 
       <section className="page-hero page-hero--compact">
         <div className="container">
@@ -128,10 +137,11 @@ export default function NewsDetailPage() {
                   Back to news
                 </Link>
               </div>
+              <ShareActions title={article.title} path={`/news/${article.slug}/`} label={`Share ${article.title}`} />
             </div>
             {article.image ? (
               <div className="split-media reveal is-visible">
-                <img src={safeImagePath(article.image)} alt={article.title} width="1600" height="1067" loading="lazy" />
+                <img src={heroImage} alt={article.title} width="1600" height="1067" loading="lazy" />
               </div>
             ) : null}
           </div>

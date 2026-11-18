@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { admin } from "../lib/api.js";
 import { formatDate } from "../lib/format.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -17,6 +17,7 @@ const QUICK_LINKS = [
 
 export default function AdminDashboard() {
   const { user, can } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
   const [activity, setActivity] = useState([]);
@@ -128,7 +129,20 @@ export default function AdminDashboard() {
                       </thead>
                       <tbody>
                         {recent.map((item) => (
-                          <tr key={item.id} className="admin-table__row--clickable" onClick={() => (window.location.href = "/admin/enquiries")} style={{ cursor: "pointer" }}>
+                          <tr
+                            key={item.id}
+                            className="admin-table__row--clickable"
+                            onClick={() => navigate("/admin/enquiries")}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                navigate("/admin/enquiries");
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Open enquiry from ${item.name}: ${item.subject}`}
+                          >
                             <td className="admin-table__title">
                               {item.name}
                               <br />

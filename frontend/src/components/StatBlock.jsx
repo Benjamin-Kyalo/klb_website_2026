@@ -82,6 +82,7 @@ function CountUp({ value, suffix, animate, index }) {
       ref={ref}
       className={`stat-block__value${done ? " is-done" : ""}`}
       style={{ transitionDelay: `${(index || 0) * 80}ms` }}
+      aria-hidden="true"
     >
       {display}
       {suffix}
@@ -122,7 +123,13 @@ export default function StatBlock({ section }) {
             return (
               <div className="stat-block__item" key={index}>
                 {number !== null ? (
-                  <CountUp value={number} suffix={suffix || stat.suffix || ""} animate={animate} index={index} />
+                  <>
+                    <CountUp value={number} suffix={suffix || stat.suffix || ""} animate={animate} index={index} />
+                    <span className="sr-only">
+                      {number.toLocaleString("en-KE")}
+                      {suffix || stat.suffix || ""}
+                    </span>
+                  </>
                 ) : (
                   <span className="stat-block__value">{stat.value}</span>
                 )}

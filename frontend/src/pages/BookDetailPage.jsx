@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getBook, getBooks } from "../lib/api.js";
-import { COLLECTION_LABELS, money, safeImagePath } from "../lib/format.js";
+import { COLLECTION_LABELS, absoluteUrl, money, safeImagePath } from "../lib/format.js";
 import Seo, { SITE_URL } from "../lib/seo.js";
 import { useSite } from "../context/SiteContext.jsx";
 import BookCard from "../components/BookCard.jsx";
 import Loading, { ErrorState } from "../components/Loading.jsx";
+import ShareActions from "../components/ShareActions.jsx";
 import { Arrow } from "../components/Icons.jsx";
 
 export default function BookDetailPage() {
@@ -79,12 +80,13 @@ export default function BookDetailPage() {
 
   const collectionLabel = COLLECTION_LABELS[book.collection] || book.collection;
   const description = `${book.title} — ${book.subject || collectionLabel} for ${book.level || "learners"}, published by Kenya Literature Bureau PLC. View details, price and buying options.`;
+  const coverImage = book.cover_url ? safeImagePath(book.cover_url) : "";
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Book",
     name: book.title,
     url: `${SITE_URL}/books/${book.slug}/`,
-    image: `${SITE_URL}${safeImagePath(book.cover_url)}`,
+    image: coverImage ? absoluteUrl(coverImage, SITE_URL) : undefined,
     description: (book.description || "").slice(0, 500),
     isbn: book.isbn || undefined,
     inLanguage: book.language || undefined,
@@ -102,7 +104,13 @@ export default function BookDetailPage() {
 
   return (
     <>
-      <Seo title={`${book.title} | Kenya Literature Bureau PLC`} description={description} path={`/books/${book.slug}/`} jsonLd={jsonLd} />
+      <Seo
+        title={`${book.title} | Kenya Literature Bureau PLC`}
+        description={description}
+        path={`/books/${book.slug}/`}
+        image={coverImage || undefined}
+        jsonLd={jsonLd}
+      />
 
       <div className="container">
         <nav className="breadcrumbs" aria-label="Breadcrumb" style={{ paddingTop: "1.6rem" }}>
@@ -161,6 +169,8 @@ export default function BookDetailPage() {
                 Enquire about a print copy
               </Link>
             </div>
+
+            <ShareActions title={book.title} path={`/books/${book.slug}/`} label={`Share ${book.title}`} />
 
             <dl className="meta-list">
               <div>

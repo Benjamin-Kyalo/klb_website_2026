@@ -40,6 +40,9 @@ export default function Header() {
   const [searching, setSearching] = useState(false);
   const searchInputRef = useRef(null);
   const searchButtonRef = useRef(null);
+  const searchShellRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const mobileCloseRef = useRef(null);
 
   const hasFilters = Boolean(filters.collection || filters.level || filters.subject);
 
@@ -62,11 +65,67 @@ export default function Header() {
   useEffect(() => {
     if (!searchOpen) return undefined;
     const onKeyDown = (event) => {
-      if (event.key === "Escape") setSearchOpen(false);
+      if (event.key === "Escape") {
+        closeSearch();
+        return;
+      }
+      if (event.key !== "Tab" || !searchShellRef.current) return;
+      const focusable = searchShellRef.current.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [searchOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    // The drawer becomes focusable only after its 360ms visibility transition.
+    const timer = window.setTimeout(() => mobileCloseRef.current?.focus(), 400);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const target = event.target;
+      const typing =
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+      if (typing || event.altKey) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openSearch();
+      } else if (event.key === "/" && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        openSearch();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!searchOpen || filterOptions) return undefined;
@@ -249,6 +308,7 @@ export default function Header() {
             <button
               className="icon-btn menu-toggle"
               type="button"
+              ref={menuButtonRef}
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
               aria-expanded={mobileOpen}
@@ -265,6 +325,7 @@ export default function Header() {
         id="mobileNav"
         aria-hidden={mobileOpen ? "false" : "true"}
         aria-label="Mobile navigation"
+        {...(mobileOpen ? {} : { inert: "" })}
       >
         <div className="mobile-nav-head">
           <Link className="brand" to="/" aria-label="Kenya Literature Bureau PLC home">
@@ -276,7 +337,7 @@ export default function Header() {
               <span className="brand-tagline">Publishers &amp; printers</span>
             </span>
           </Link>
-          <button className="icon-btn" type="button" onClick={() => setMobileOpen(false)} aria-label="Close menu">
+          <button className="icon-btn" type="button" ref={mobileCloseRef} onClick={() => setMobileOpen(false)} aria-label="Close menu">
             <CloseIcon />
           </button>
         </div>
@@ -337,7 +398,7 @@ export default function Header() {
             if (event.target === event.currentTarget) closeSearch();
           }}
         >
-          <div className="search-shell">
+          <div className="search-shell" ref={searchShellRef}>
             <h2 className="sr-only" id="searchTitle">
               Search KLB books
             </h2>

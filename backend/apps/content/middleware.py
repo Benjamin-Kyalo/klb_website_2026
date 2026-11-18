@@ -35,7 +35,10 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
                 "media-src 'self' https://code.tidio.co https://*.tidio.co; "
                 "frame-src 'self' https://code.tidio.co https://*.tidio.co; "
                 "connect-src 'self' https://code.tidio.co https://*.tidio.co wss://*.tidio.co; "
-                "frame-ancestors 'none';"
+                "frame-ancestors 'none'; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self';"
             )
             response["Content-Security-Policy"] = csp
 
